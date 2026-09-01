@@ -1,27 +1,28 @@
-# Nobble
+<p align="center">
+  <img src="https://raw.githubusercontent.com/TheSoloHacker47/nobble/main/docs/assets/nobble-banner.png" alt="Nobble — catch weakened tests before they merge" width="100%">
+</p>
 
-[![CI](https://github.com/TheSoloHacker47/nobble/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSoloHacker47/nobble/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/nobble.svg)](https://www.npmjs.com/package/nobble)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TheSoloHacker47/nobble/blob/main/LICENSE)
+<p align="center">
+  <a href="https://github.com/TheSoloHacker47/nobble/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/TheSoloHacker47/nobble/ci.yml?branch=main&style=flat-square&label=build" alt="Build status"></a>
+  <a href="https://www.npmjs.com/package/nobble"><img src="https://img.shields.io/npm/v/nobble?style=flat-square&color=32c7e8" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/nobble"><img src="https://img.shields.io/npm/dm/nobble?style=flat-square&color=65e6bd" alt="Monthly npm downloads"></a>
+  <a href="https://github.com/TheSoloHacker47/nobble/releases"><img src="https://img.shields.io/github/v/release/TheSoloHacker47/nobble?style=flat-square&color=f7b955" alt="GitHub release"></a>
+  <a href="https://github.com/TheSoloHacker47/nobble/blob/main/LICENSE"><img src="https://img.shields.io/github/license/TheSoloHacker47/nobble?style=flat-square" alt="MIT license"></a>
+</p>
 
-**Catches nobbled tests.** Nobble reads a pull request diff and flags changes where the
-tests were weakened to make the code pass, rather than the code being fixed to make the
-tests pass.
+<p align="center"><strong>A deterministic GitHub Action and CLI that catches pull requests where tests were weakened instead of fixed.</strong></p>
 
-To nobble is to tamper with a racehorse before a race so it cannot win. That is precisely
-what happens to a test suite when someone edits it to stop it failing.
-
-[![Nobble flagging five weakened tests on a pull request](https://raw.githubusercontent.com/TheSoloHacker47/nobble/main/docs/pr-comment.png)](https://github.com/TheSoloHacker47/nobble/pull/1)
-
-<sub>A real comment from [pull request #1](https://github.com/TheSoloHacker47/nobble/pull/1), which weakens the payment suite on purpose. The critical finding is a mock introduced around `current_user`.</sub>
+<p align="center">
+  <a href="#quick-start">Quick start</a> ·
+  <a href="#what-nobble-catches">Rules</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#action-reference">Action reference</a> ·
+  <a href="https://www.npmjs.com/package/nobble">npm</a>
+</p>
 
 ---
 
-## The problem
-
-Reviewing AI-assisted pull requests keeps hitting the same failure mode: the agent cannot
-make a test pass, so it edits the test. The change is two lines inside a 1,500-line diff,
-and it looks like ordinary test maintenance.
+To **nobble** is to tamper with a racehorse before a race so it cannot win. The same thing happens to a test suite when someone edits it just to stop it failing.
 
 ```diff
  it('charges the card', () => {
@@ -32,104 +33,151 @@ and it looks like ordinary test maintenance.
  });
 ```
 
-The suite is green, the diff is small, and the test now passes for a charge of any non-zero
-amount. Nobble puts that at the top of the review.
+The suite is green. The assertion is not. Nobble puts that change at the top of the review.
 
-## Quickstart
+## Why Nobble
+
+Large, AI-assisted pull requests can hide tiny changes that make a test suite easier to pass: a deleted assertion, a skipped test, an authorization mock, a lower coverage threshold, or `continue-on-error: true`. Nobble is built for that one review gap.
+
+| Focused                                                         | Private by design                                                       | Predictable                                            | Safe to adopt                                             |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------- |
+| 16 rules for test, security, source, coverage, and CI weakening | Runs inside your workflow; no model calls and no code sent to a service | Static rules produce the same result for the same diff | Reports without failing CI until you opt into enforcement |
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/TheSoloHacker47/nobble/main/docs/assets/how-nobble-works.svg" alt="Nobble reads a diff, detects weakening, scores risk, and reports in the pull request" width="100%">
+</p>
+
+## Quick start
+
+Add `.github/workflows/nobble.yml`:
 
 ```yaml
-- uses: actions/checkout@v4
-  with: { fetch-depth: 0 }
-- uses: TheSoloHacker47/nobble@v1
+name: Nobble
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: TheSoloHacker47/nobble@v1
 ```
 
-Locally:
+That is enough for a sticky PR comment and workflow annotations. The default is deliberately non-blocking.
+
+Prefer the CLI?
 
 ```bash
 npx nobble --base main
 ```
 
-## What it catches
+No install is required. Nobble needs Node.js 20 or newer when used as a CLI.
 
-| Rule      | Severity     | Weight | Fires when                                                                                                                                  |
-| --------- | ------------ | ------ | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| `NOB-101` | high         | 30     | Assertions removed from a test that still exists — `expect(a).toBe(1); expect(b).toBe(2);` becomes just the first                           |
-| `NOB-102` | high         | 30     | An assertion replaced with a weaker one — `toBe(1000)` → `toBeTruthy()`, `toHaveBeenCalledWith(id)` → `toHaveBeenCalled()`                  |
-| `NOB-103` | high         | 25     | A whole test block deleted — `it('rejects an expired card')` is gone and nothing like it was added back                                     |
-| `NOB-104` | high         | 25     | A test disabled — `it.skip`, `xit`, `@pytest.mark.skip`, `pending`, `t.Skip()`, `@Ignore`                                                   |
-| `NOB-105` | medium       | 15     | An expectation inverted rather than satisfied — `toBe(y)` → `not.toBe(y)`, `assertEqual` → `assertNotEqual`                                 |
-| `NOB-201` | **critical** | 40     | A mock introduced around a sensitive symbol — `jest.mock('../auth/current_user')`, `allow(policy).to receive(:authorize)`                   |
-| `NOB-202` | high         | 25     | A security-path file changed while its paired test was untouched, or only lost assertions                                                   |
-| `NOB-203` | high         | 25     | An unconditional early exit at the top of a security function — `return true;` above the check it skips                                     |
-| `NOB-301` | medium       | 10     | A blanket suppression added — `@ts-ignore`, `as any`, bare `# type: ignore`. Coded ones like `# type: ignore[return-value]` do **not** fire |
-| `NOB-302` | medium       | 15     | An empty or log-only `catch` / `except` / `rescue` added around code that used to propagate                                                 |
-| `NOB-303` | low          | 8      | A fixed sleep added to a test — `setTimeout`, `time.sleep`. Not flagged when the diff also removes one                                      |
-| `NOB-401` | high         | 30     | A coverage threshold lowered in `jest.config.*`, `.coveragerc`, `codecov.yml`, `pyproject.toml`, `sonar-project.properties`                 |
-| `NOB-402` | **critical** | 40     | A CI check neutralized — `continue-on-error: true`, `\|\| true` on a test command, a `run:` step with tests removed                         |
-| `NOB-403` | high         | 25     | A test path added to an ignore list — `testPathIgnorePatterns`, `.eslintignore`, `norecursedirs`                                            |
-| `NOB-404` | medium       | 15     | A lockfile integrity field removed, or a dependency downgraded across a major version                                                       |
-| `NOB-001` | low          | 5      | A `nobble-ignore` comment with no reason after the colon                                                                                    |
+## See it in a pull request
 
-Score is the sum of weights, capped at 100. **0 = pass, 1–39 = warn, 40+ = block.**
+<p align="center">
+  <a href="https://github.com/TheSoloHacker47/nobble/pull/1">
+    <img src="https://raw.githubusercontent.com/TheSoloHacker47/nobble/main/docs/pr-comment.png" alt="A real Nobble pull request comment with five findings" width="880">
+  </a>
+</p>
 
-## False positives
+<p align="center"><sub>A real comment from <a href="https://github.com/TheSoloHacker47/nobble/pull/1">pull request #1</a>, which intentionally weakens the payment suite.</sub></p>
 
-Nobble judges the diff, not the author. It cannot know whether a deleted test _should_ have
-been deleted — only that it was. So the defaults are built around not being in your way:
+## What Nobble catches
 
-**The default posture is non-blocking.** The action comments and exits 0 unless you opt in
-with `fail-on: block`. A tool that breaks your CI on day one gets uninstalled on day one.
+| Area                            | Rules           | Examples                                                                        |
+| ------------------------------- | --------------- | ------------------------------------------------------------------------------- |
+| **Assertions & tests**          | `NOB-101`–`105` | Assertions removed or weakened, tests deleted or skipped, expectations inverted |
+| **Security boundaries**         | `NOB-201`–`203` | Sensitive mocks, untested security-path changes, early-return bypasses          |
+| **Escape hatches**              | `NOB-301`–`303` | Blanket suppressions, swallowed exceptions, fixed sleeps                        |
+| **Coverage, CI & dependencies** | `NOB-401`–`404` | Lower thresholds, neutralized checks, excluded tests, weakened lockfiles        |
+| **Suppression hygiene**         | `NOB-001`       | A `nobble-ignore` comment without a reason                                      |
 
-**Measured finding rate.** Run against the last 50 merged pull requests of
-[`vitejs/vite`](https://github.com/vitejs/vite), [`pallets/flask`](https://github.com/pallets/flask),
-and [`sinatra/sinatra`](https://github.com/sinatra/sinatra) — 150 ordinary human PRs:
+<details>
+<summary><strong>View all 16 rules and default weights</strong></summary>
 
-|                                               |                     |
-| --------------------------------------------- | ------------------- |
-| PRs with at least one finding                 | **5.3%** (8 of 150) |
-| PRs that touched a test file and were flagged | 16.7% (7 of 42)     |
-| **PRs reaching verdict `block`**              | **2.0%** (3 of 150) |
+| Rule      | Severity | Weight | Fires when…                                                         |
+| --------- | -------- | -----: | ------------------------------------------------------------------- |
+| `NOB-101` | high     |     30 | Assertions are removed from a test that still exists                |
+| `NOB-102` | high     |     30 | A precise assertion becomes a weaker one                            |
+| `NOB-103` | high     |     25 | A test block is deleted without a similar replacement               |
+| `NOB-104` | high     |     25 | A test is disabled with `skip`, `todo`, `pending`, or an equivalent |
+| `NOB-105` | medium   |     15 | An expectation is inverted instead of satisfied                     |
+| `NOB-201` | critical |     40 | A mock is introduced around a sensitive symbol                      |
+| `NOB-202` | high     |     25 | Security-path code changes without corresponding test coverage      |
+| `NOB-203` | high     |     25 | An unconditional early exit is added to a security function         |
+| `NOB-301` | medium   |     10 | A blanket type or lint suppression is added                         |
+| `NOB-302` | medium   |     15 | An empty or log-only exception handler is added                     |
+| `NOB-303` | low      |      8 | A fixed sleep is added to a test                                    |
+| `NOB-401` | high     |     30 | A coverage threshold is lowered                                     |
+| `NOB-402` | critical |     40 | A CI test or check is made non-failing                              |
+| `NOB-403` | high     |     25 | A test path is added to an ignore list                              |
+| `NOB-404` | medium   |     15 | Lockfile integrity is removed or a dependency drops a major version |
+| `NOB-001` | low      |      5 | A Nobble suppression has no explanation                             |
 
-The three that would block are `sinatra/sinatra#2115` (titled _"Skip broken tests."_), its
-revert `#2124`, and `#2114`, which deletes two test cases. All three are changes worth a
-reviewer's attention, which is the entire point.
+</details>
 
-The 16.7% figure is the strict one and is quoted here rather than hidden: among PRs that
-touch tests, roughly one in six gets a finding. Every one of those in the sample accurately
-described a real event — a test deleted, a test skipped, a blanket suppression added.
+Scores are the sum of finding weights, capped at 100: **0 = pass**, **1–39 = warn**, **40+ = block**.
 
-Reproduce it yourself:
+## Built for signal, not noise
 
-```bash
-npm run smoke -- --limit 50 --verbose
+Nobble reports what changed in the diff; it does not guess why the author changed it. Its rules were calibrated against 150 merged pull requests from Vite, Flask, and Sinatra.
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/TheSoloHacker47/nobble/main/docs/assets/calibration-chart.svg" alt="Calibration results: 5.3 percent of all pull requests had findings, 16.7 percent of test-touching pull requests had findings, and 2 percent reached block" width="100%">
+</p>
+
+The three PRs that reached `block` were changes worth a reviewer’s attention: one was titled “Skip broken tests,” one reverted it, and one deleted two test cases. Reproduce the sample yourself with `npm run smoke -- --limit 50 --verbose`.
+
+## Language support
+
+| Language                    | Analysis        | Test frameworks                                                |
+| --------------------------- | --------------- | -------------------------------------------------------------- |
+| TypeScript, JavaScript, TSX | tree-sitter AST | Jest, Vitest, Mocha, Chai                                      |
+| Python                      | tree-sitter AST | pytest, unittest                                               |
+| Ruby                        | tree-sitter AST | RSpec, Minitest                                                |
+| Everything else             | regex fallback  | Language-independent skip, suppression, coverage, and CI rules |
+
+## Start reporting, then enforce
+
+Nobble exits successfully by default. Once your team is comfortable with the signal, enable blocking:
+
+```yaml
+- uses: TheSoloHacker47/nobble@v1
+  with:
+    fail-on: block
 ```
 
-**When a finding is wrong**, you have three levers, in increasing order of bluntness:
+To suppress a finding, leave a reason in the diff:
 
 ```ts
 // nobble-ignore NOB-102: rewriting this suite for the new API shape, see #482
 ```
 
-A reason is mandatory. A suppression with nothing after the colon does not suppress
-anything — it reports itself as `NOB-001` and leaves the original finding standing. That
-keeps the escape hatch honest.
-
-Per-rule config, and whole-rule disabling, are both in `.nobble.yml` below.
+The reason is mandatory. An empty reason triggers `NOB-001` and leaves the original finding active.
 
 ## Configuration
 
-Everything is optional. `.nobble.yml` at the repo root:
+Everything is optional. Create `.nobble.yml` at the repository root only when you need to tune the defaults:
 
 ```yaml
 version: 1
 
-fail_on: none # none | block | warn
+fail_on: none # none | warn | block
 
 paths:
-  tests: # REPLACES the built-in test globs
+  tests: # replaces built-in test globs
     - 'spec/**'
     - '**/*.test.ts'
-  security: # REPLACES the built-in security-path globs
+  security: # replaces built-in security globs
     - 'app/policies/**'
     - 'app/middleware/**'
   ignore:
@@ -138,11 +186,11 @@ paths:
 
 rules:
   NOB-303:
-    enabled: false # turn a rule off entirely
+    enabled: false
   NOB-301:
-    severity: low # or downgrade it
+    severity: low
   NOB-201:
-    symbols: # APPENDS to the default sensitive-symbol list
+    symbols: # appends to the built-in sensitive-symbol list
       - 'billing_account'
       - 'feature_flag'
 
@@ -155,27 +203,38 @@ report:
   comment_mode: sticky # sticky | new | none
 ```
 
-Note the asymmetry: `paths.*` replaces the defaults, `NOB-201.symbols` appends to them.
+## Action reference
 
-### CLI
+### Inputs
 
+| Input          | Default               | Description                                                            |
+| -------------- | --------------------- | ---------------------------------------------------------------------- |
+| `fail-on`      | `none`                | Exit non-zero for `warn` or `block`, or keep the Action reporting-only |
+| `config`       | `.nobble.yml`         | Path to the configuration file                                         |
+| `comment`      | `true`                | Post the pull request comment                                          |
+| `github-token` | `${{ github.token }}` | Token used to write the sticky comment                                 |
+| `sarif-file`   | `nobble.sarif`        | Path where SARIF output is written                                     |
+
+### Outputs
+
+| Output       | Description                      |
+| ------------ | -------------------------------- |
+| `score`      | Total risk score from 0 to 100   |
+| `verdict`    | `pass`, `warn`, or `block`       |
+| `findings`   | JSON array of findings           |
+| `sarif-file` | Path to the generated SARIF file |
+
+Use outputs in later steps by assigning an `id`:
+
+```yaml
+- uses: TheSoloHacker47/nobble@v1
+  id: nobble
+- run: echo "Nobble verdict: ${{ steps.nobble.outputs.verdict }}"
 ```
-npx nobble [options]
 
-  --base <ref>          Base git ref to diff against       [default: origin/HEAD]
-  --head <ref>          Head ref                           [default: working tree]
-  --diff <file>         Read a unified diff from a file or "-" for stdin
-  --config <path>       Config file path                   [default: .nobble.yml]
-  --format <fmt>        terminal | markdown | json | sarif [default: terminal]
-  --fail-on <level>     none | warn | block                [default: none]
-  --rules <ids>         Comma separated allowlist of rule IDs to run
-  --quiet               Only print findings, no summary
-  --version, --help
-```
+### Inline code-scanning annotations
 
-### Inline annotations
-
-To get findings on the lines themselves in Files Changed, upload the SARIF:
+Upload Nobble’s SARIF to see findings on exact lines in **Files changed**:
 
 ```yaml
 permissions:
@@ -184,8 +243,9 @@ permissions:
   security-events: write
 
 steps:
-  - uses: actions/checkout@v4
-    with: { fetch-depth: 0 }
+  - uses: actions/checkout@v5
+    with:
+      fetch-depth: 0
   - uses: TheSoloHacker47/nobble@v1
   - uses: github/codeql-action/upload-sarif@v4
     if: always()
@@ -194,75 +254,38 @@ steps:
       category: nobble
 ```
 
-Code scanning upload is free on public repositories; private repositories need GitHub
-Advanced Security. Without it, Nobble still posts the PR comment and workflow annotations.
+Code-scanning upload is available for public repositories. Private-repository availability depends on the repository’s GitHub security plan. Nobble’s PR comment and workflow annotations work without SARIF upload.
 
-## How it is different
+## CLI reference
 
-**Linters** check that code follows conventions. Nobble does not care about conventions; it
-compares a test file against its own previous version and reports what got weaker.
+```text
+npx nobble [options]
 
-**Coverage gates** tell you a percentage moved. They cannot tell you that
-`expect(total).toBe(1030)` became `expect(total).toBeTruthy()` — the line is still covered.
-Nobble detects tampering with the coverage _configuration_ but never measures coverage.
-
-**AI code review bots** send your diff to a model and return prose. Nobble makes no network
-calls, runs no inference, and sends your code nowhere. Same input, same output, every time.
-
-It targets exactly one failure mode. Everything in §2 of the [spec](https://github.com/TheSoloHacker47/nobble/blob/main/nobble-spec.md) —
-detecting AI authorship, style scoring, running your tests, auto-fixing — is deliberately
-out of scope.
-
-## Writing a custom rule
-
-A rule is one object. Implement `Rule`, add it to the registry in `src/rules/register.ts`,
-and nothing else changes:
-
-```ts
-import type { Rule } from './types.js';
-import { makeFinding } from './helpers.js';
-
-export const nob999: Rule = {
-  id: 'NOB-999',
-  title: 'Snapshot obsoleted rather than updated',
-  defaultSeverity: 'medium',
-  weight: 15,
-  requiresAst: false,
-  appliesTo: ['test'],
-  rationale: 'Deleting a snapshot file makes the assertion vacuous instead of reviewing it.',
-
-  run(ctx) {
-    return ctx.addedLines
-      .filter((line) => /toMatchSnapshot\(\)/.test(line.text))
-      .map((line) =>
-        makeFinding(ctx, {
-          line: line.line,
-          message: `Snapshot assertion added in \`${ctx.file.path}\`.`,
-          after: line.text,
-        }),
-      );
-  },
-};
+  --base <ref>          Base git ref to diff against       [default: origin/HEAD]
+  --head <ref>          Head ref                           [default: working tree]
+  --diff <file>         Read a unified diff from a file or "-" for stdin
+  --config <path>       Config file path                   [default: .nobble.yml]
+  --format <fmt>        terminal | markdown | json | sarif [default: terminal]
+  --fail-on <level>     none | warn | block                [default: none]
+  --rules <ids>         Comma-separated allowlist of rule IDs
+  --quiet               Print findings without the summary
+  --version, --help
 ```
 
-`ctx` carries the parsed diff, the before and after file contents, both ASTs when the
-language has an adapter, the paired test file, and the resolved config. Adding a _language_
-is the same shape: implement `LanguageAdapter`, register it, change nothing else.
+## How Nobble is different
 
-## Language support
+| Tool           | What it answers                            | What Nobble adds                                                |
+| -------------- | ------------------------------------------ | --------------------------------------------------------------- |
+| Linters        | “Does this code follow our rules?”         | Compares tests with their previous version to find weakening    |
+| Coverage gates | “Did the percentage move?”                 | Finds semantic weakening even when the line stays covered       |
+| AI review bots | “What does a model think about this diff?” | Deterministic, offline rules with no inference or data transfer |
 
-| Language                      | Parser      | Frameworks                                                                            |
-| ----------------------------- | ----------- | ------------------------------------------------------------------------------------- |
-| TypeScript / JavaScript / TSX | tree-sitter | Jest, Vitest, Mocha, Chai                                                             |
-| Ruby                          | tree-sitter | RSpec, Minitest                                                                       |
-| Python                        | tree-sitter | pytest, unittest                                                                      |
-| Everything else               | regex       | The rules that need no AST still run: skips, suppressions, coverage config, CI config |
+Nobble deliberately does **not** detect AI authorship, run tests, score style, measure coverage, auto-fix code, or operate a hosted service.
 
 ## Contributing
 
-See [CONTRIBUTING.md](https://github.com/TheSoloHacker47/nobble/blob/main/CONTRIBUTING.md). Every rule needs at least three positive and three
-negative fixtures; the negatives are the ones that matter. [DECISIONS.md](https://github.com/TheSoloHacker47/nobble/blob/main/DECISIONS.md)
-records every ambiguity resolved while building this, including the two places the original
-spec turned out to be wrong about the world.
+Issues and pull requests are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md); every new rule needs positive and negative fixtures. Design tradeoffs and spec deviations are documented in [DECISIONS.md](DECISIONS.md).
 
-MIT licensed.
+## License
+
+[MIT](LICENSE) © TheSoloHacker47

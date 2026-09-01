@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-labelledby="title desc">
+  <title id="title">How Nobble reviews a pull request</title>
+  <desc id="desc">Nobble reads a pull request diff, detects test and security weakening, scores the findings, and reports a pass, warn, or block verdict.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07111f"/><stop offset="1" stop-color="#020817"/></linearGradient>
+    <linearGradient id="line" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#32c7e8"/><stop offset="1" stop-color="#65e6bd"/></linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1200" height="300" rx="24" fill="url(#bg)"/>
+  <path d="M245 150h70m170 0h70m170 0h70" stroke="url(#line)" stroke-width="3" stroke-dasharray="7 8"/>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif" text-anchor="middle">
+    <g transform="translate(35 54)"><rect width="210" height="192" rx="18" fill="#0c1b2c" stroke="#1f465f"/><circle cx="105" cy="52" r="27" fill="#102e42" stroke="#32c7e8"/><path d="M92 45h26M92 53h18M92 61h22" stroke="#9deeff" stroke-width="4" stroke-linecap="round"/><text x="105" y="111" fill="#f6f8fa" font-size="22" font-weight="700">READ THE DIFF</text><text x="105" y="142" fill="#9fb3c8" font-size="15">Before vs. after</text><text x="105" y="165" fill="#9fb3c8" font-size="15">No code execution</text></g>
+    <g transform="translate(315 54)"><rect width="210" height="192" rx="18" fill="#0c1b2c" stroke="#1f465f"/><circle cx="105" cy="52" r="27" fill="#102e42" stroke="#65e6bd"/><path d="M92 52l9 9 18-21" fill="none" stroke="#65e6bd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><text x="105" y="111" fill="#f6f8fa" font-size="22" font-weight="700">FIND WEAKENING</text><text x="105" y="142" fill="#9fb3c8" font-size="15">16 focused rules</text><text x="105" y="165" fill="#9fb3c8" font-size="15">AST + regex</text></g>
+    <g transform="translate(555 54)"><rect width="210" height="192" rx="18" fill="#0c1b2c" stroke="#1f465f"/><circle cx="105" cy="52" r="27" fill="#2b2412" stroke="#f7b955"/><text x="105" y="61" fill="#f7b955" font-size="25" font-weight="800">40</text><text x="105" y="111" fill="#f6f8fa" font-size="22" font-weight="700">SCORE THE RISK</text><text x="105" y="142" fill="#9fb3c8" font-size="15">Severity-weighted</text><text x="105" y="165" fill="#9fb3c8" font-size="15">Configurable thresholds</text></g>
+    <g transform="translate(795 54)"><rect width="370" height="192" rx="18" fill="#0c1b2c" stroke="#1f465f"/><circle cx="185" cy="52" r="27" fill="#142b25" stroke="#65e6bd" filter="url(#glow)"/><path d="M172 52l9 9 18-21" fill="none" stroke="#65e6bd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><text x="185" y="111" fill="#f6f8fa" font-size="22" font-weight="700">REPORT IN THE PR</text><text x="185" y="142" fill="#9fb3c8" font-size="15">Sticky comment · annotations · SARIF</text><text x="185" y="169" fill="#65e6bd" font-size="15" font-weight="700">PASS</text><text x="236" y="169" fill="#6f8092" font-size="15">·</text><text x="275" y="169" fill="#f7b955" font-size="15" font-weight="700">WARN</text><text x="326" y="169" fill="#6f8092" font-size="15">·</text><text x="360" y="169" fill="#ff7b72" font-size="15" font-weight="700">BLOCK</text></g>
+  </g>
+</svg>

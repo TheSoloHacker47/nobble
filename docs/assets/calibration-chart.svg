@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="410" viewBox="0 0 1200 410" role="img" aria-labelledby="title desc">
+  <title id="title">Nobble calibration results across 150 merged pull requests</title>
+  <desc id="desc">5.3 percent of all pull requests had findings, 16.7 percent of pull requests touching tests had findings, and 2 percent of all pull requests reached the block verdict.</desc>
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#07111f"/><stop offset="1" stop-color="#020817"/></linearGradient><linearGradient id="bar" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#32c7e8"/><stop offset="1" stop-color="#65e6bd"/></linearGradient></defs>
+  <rect width="1200" height="410" rx="24" fill="url(#bg)"/>
+  <g font-family="Inter,Segoe UI,Arial,sans-serif">
+    <text x="58" y="62" fill="#f6f8fa" font-size="27" font-weight="700">Calibrated on real pull requests</text>
+    <text x="58" y="91" fill="#9fb3c8" font-size="16">150 merged PRs · Vite, Flask, and Sinatra · 50 from each project</text>
+    <g transform="translate(58 135)">
+      <text x="0" y="18" fill="#d7e2ed" font-size="17">All PRs with a finding</text><rect x="320" y="0" width="720" height="24" rx="12" fill="#122237"/><rect x="320" y="0" width="229" height="24" rx="12" fill="#32c7e8"/><text x="1065" y="19" fill="#65e6bd" font-size="19" font-weight="700">5.3%</text>
+      <text x="0" y="100" fill="#d7e2ed" font-size="17">Test-touching PRs with a finding</text><rect x="320" y="82" width="720" height="24" rx="12" fill="#122237"/><rect x="320" y="82" width="721" height="24" rx="12" fill="#65e6bd"/><text x="1065" y="101" fill="#65e6bd" font-size="19" font-weight="700">16.7%</text>
+      <text x="0" y="182" fill="#d7e2ed" font-size="17">All PRs reaching block</text><rect x="320" y="164" width="720" height="24" rx="12" fill="#122237"/><rect x="320" y="164" width="86" height="24" rx="12" fill="#ff7b72"/><text x="1065" y="183" fill="#ff9b93" font-size="19" font-weight="700">2.0%</text>
+    </g>
+    <text x="58" y="365" fill="#7f93a8" font-size="14">Bars share a 0–16.7% scale. Findings describe diff events; they do not claim author intent.</text>
+  </g>
+</svg>
