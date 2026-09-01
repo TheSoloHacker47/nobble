@@ -15803,15 +15803,15 @@ var COMMENT_DIRECTIVES = [
 ];
 var TARGETED_SUPPRESSION = [
   /#\s*type:\s*ignore\[[^\]]+\]/,
-  //          # type: ignore[return-value]
+  //             "# type: ignore[return-value]"
   /#\s*noqa\s*:\s*\w+/,
-  //                     # noqa: F821
+  //                        "# noqa: F821"
   /eslint-disable(?:-next-line|-line)?\s+[\w@/-]+/,
-  // eslint-disable-next-line no-shadow
+  // "eslint-disable-next-line <rule>"
   /rubocop:disable\s+[\w/]+/,
-  //                rubocop:disable Style/Documentation
+  //                   "rubocop:disable Style/Documentation"
   /nolint:\w+/
-  //                              nolint:errcheck
+  //                                 "nolint:errcheck"
 ];
 function isTargeted(text) {
   return TARGETED_SUPPRESSION.some((re) => re.test(text));

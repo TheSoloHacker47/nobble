@@ -1,0 +1,43 @@
+name: Nobble
+description: Flags pull requests where tests were weakened instead of fixed
+author: TheSoloHacker47
+branding:
+  icon: alert-triangle
+  color: red
+
+inputs:
+  fail-on:
+    description: none | warn | block. Default is non-blocking.
+    required: false
+    default: none
+  config:
+    description: Path to .nobble.yml
+    required: false
+    default: .nobble.yml
+  comment:
+    description: Post a PR comment
+    required: false
+    default: 'true'
+  github-token:
+    description: Token used to post the sticky PR comment
+    required: false
+    default: ${{ github.token }}
+  sarif-file:
+    description: Where to write SARIF output, for a separate upload-sarif step
+    required: false
+    default: nobble.sarif
+
+outputs:
+  score:
+    description: Total risk score
+  verdict:
+    description: pass | warn | block
+  findings:
+    description: JSON array of findings
+  sarif-file:
+    description: Path of the written SARIF file
+
+runs:
+  # node20 was removed from GitHub-hosted runners on 2026-09-16. See DECISIONS.md D1.
+  using: node24
+  main: dist/index.js

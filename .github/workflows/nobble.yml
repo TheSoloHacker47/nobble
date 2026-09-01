@@ -1,0 +1,31 @@
+name: Nobble
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  security-events: write
+
+jobs:
+  nobble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # Dogfooding: run the action from this checkout rather than a published tag, so a PR
+      # is checked by the code the PR itself contains.
+      - uses: ./
+        id: nobble
+        with:
+          fail-on: block
+
+      - name: Upload SARIF
+        if: always() && hashFiles('nobble.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: nobble.sarif
+          category: nobble

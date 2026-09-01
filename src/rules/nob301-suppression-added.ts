@@ -37,12 +37,15 @@ const COMMENT_DIRECTIVES: { re: RegExp; label: string }[] = [
  * 16 findings across 150 real PRs, and every one of those was a narrow, coded suppression
  * in ordinary typed-Python or lint work. See DECISIONS.md A8 for the measured effect.
  */
+// The examples are spelled with a placeholder rather than verbatim, because ESLint parses
+// a real `eslint-disable-next-line <rule>` in a comment as an actual directive -- including
+// one written here only to document what this rule matches.
 const TARGETED_SUPPRESSION = [
-  /#\s*type:\s*ignore\[[^\]]+\]/, //          # type: ignore[return-value]
-  /#\s*noqa\s*:\s*\w+/, //                     # noqa: F821
-  /eslint-disable(?:-next-line|-line)?\s+[\w@/-]+/, // eslint-disable-next-line no-shadow
-  /rubocop:disable\s+[\w/]+/, //                rubocop:disable Style/Documentation
-  /nolint:\w+/, //                              nolint:errcheck
+  /#\s*type:\s*ignore\[[^\]]+\]/, //             "# type: ignore[return-value]"
+  /#\s*noqa\s*:\s*\w+/, //                        "# noqa: F821"
+  /eslint-disable(?:-next-line|-line)?\s+[\w@/-]+/, // "eslint-disable-next-line <rule>"
+  /rubocop:disable\s+[\w/]+/, //                   "rubocop:disable Style/Documentation"
+  /nolint:\w+/, //                                 "nolint:errcheck"
 ];
 
 function isTargeted(text: string): boolean {

@@ -1,0 +1,14 @@
+# Nobble's own config, so the tool runs on its own pull requests.
+version: 1
+
+# Dogfooding at the strictest setting we ask anyone else to use. If our own rules are too
+# noisy to live with here, that is worth knowing before a user finds out.
+fail_on: block
+
+paths:
+  ignore:
+    # Fixture trees are deliberately-nobbled code. They are the test data, not the code
+    # under review, and Nobble analyzing its own fixtures would flag every one of them.
+    - 'test/fixtures/**'
+    # dist/ is generated and committed for the Action runtime.
+    - 'dist/**'
