@@ -1,0 +1,6 @@
+dist/
+coverage/
+test/fixtures/
+node_modules/
+# The build spec is an input document, not our source. Never reformat it.
+nobble-spec.md

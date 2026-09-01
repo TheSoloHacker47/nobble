@@ -1,0 +1,8 @@
+node_modules/
+coverage/
+*.tsbuildinfo
+.DS_Store
+nobble.sarif
+/tmp/
+*.tmp.mjs
+.smoke-cache/

@@ -1,0 +1,71 @@
+{
+  "name": "nobble",
+  "version": "0.1.0",
+  "description": "Catches nobbled tests. Flags pull requests where tests were weakened instead of fixed.",
+  "keywords": [
+    "code-review",
+    "testing",
+    "github-action",
+    "static-analysis",
+    "pull-request"
+  ],
+  "license": "MIT",
+  "author": "TheSoloHacker47",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheSoloHacker47/nobble.git"
+  },
+  "homepage": "https://github.com/TheSoloHacker47/nobble#readme",
+  "bugs": {
+    "url": "https://github.com/TheSoloHacker47/nobble/issues"
+  },
+  "type": "module",
+  "bin": {
+    "nobble": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "action.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
+    "smoke": "node --experimental-strip-types scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@actions/core": "^3.0.1",
+    "@actions/github": "^9.1.1",
+    "@vscode/tree-sitter-wasm": "^0.3.1",
+    "parse-diff": "^0.12.0",
+    "picomatch": "^4.0.2",
+    "web-tree-sitter": "^0.25.10",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.15.0",
+    "@types/node": "^24.0.0",
+    "@types/picomatch": "^4.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
+    "esbuild": "^0.28.2",
+    "eslint": "^9.15.0",
+    "globals": "^17.12.0",
+    "prettier": "^3.4.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.16.0",
+    "vitest": "^4.1.11"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
