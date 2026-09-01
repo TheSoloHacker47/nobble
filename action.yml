@@ -1,4 +1,9 @@
-name: Nobble
+# GitHub Marketplace requires this name to be unique across every action, USER, and
+# ORGANIZATION on GitHub -- not just across Marketplace listings. A user account named
+# "Nobble" has existed since 2014, so the bare brand name is rejected. See DECISIONS.md A18.
+# This is the Marketplace display name only: the npm package, the repository, and
+# `uses: TheSoloHacker47/nobble@v1` are all unaffected.
+name: Nobble Test Integrity
 description: Flags pull requests where tests were weakened instead of fixed
 author: TheSoloHacker47
 branding:

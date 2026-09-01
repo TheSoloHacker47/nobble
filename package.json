@@ -1,6 +1,6 @@
 {
   "name": "nobble",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Catches nobbled tests. Flags pull requests where tests were weakened instead of fixed.",
   "keywords": [
     "code-review",

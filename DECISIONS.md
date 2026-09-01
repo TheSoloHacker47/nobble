@@ -310,6 +310,34 @@ Roughly double the required file count at about a seventh of the budget. The bat
 `git cat-file --batch` blob reader is what buys it; one `git show` per file would spend the
 whole budget on process spawns.
 
+### A18. The Action's Marketplace name is "Nobble Test Integrity", not "Nobble"
+
+GitHub Marketplace requires an action's `name` to be unique across **every action, user,
+and organization on GitHub** -- not merely across existing Marketplace listings. A user
+account named `Nobble` has existed since 2014-08-11, so `name: Nobble` is rejected with
+"Name must be unique. Cannot match an existing action, user or organization name."
+
+This was missed during release prep because the pre-flight check only tested
+`github.com/marketplace/actions/nobble` (404, free) and never tested `github.com/nobble`
+(200, taken). The lesson is the check, not the name: **verify the user/org namespace, not
+just the Marketplace namespace.**
+
+**Decision:** the Marketplace display name is `Nobble Test Integrity`. "Integrity" over
+"Guard" because the tool's default posture is non-blocking, and a name implying it gates CI
+would misrepresent it.
+
+Scope of the change is narrow and deliberate. Unaffected:
+
+|                  |                                       |
+| ---------------- | ------------------------------------- |
+| npm package      | `nobble` (already published as 1.0.0) |
+| Repository       | `TheSoloHacker47/nobble`              |
+| Action reference | `uses: TheSoloHacker47/nobble@v1`     |
+| CLI binary       | `nobble`                              |
+| Rule ID prefix   | `NOB-`                                |
+
+Only the Marketplace listing title and its derived slug change.
+
 ---
 
 ## Runtime dependency justifications

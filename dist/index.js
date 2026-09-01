@@ -34289,7 +34289,7 @@ function getOctokit(token, options, ...additionalPlugins) {
 }
 
 // src/version.ts
-var VERSION7 = true ? "1.0.0" : "0.0.0-dev";
+var VERSION7 = true ? "1.0.1" : "0.0.0-dev";
 
 // src/config/load.ts
 var import_yaml = __toESM(require_dist(), 1);
