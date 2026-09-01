@@ -34288,6 +34288,9 @@ function getOctokit(token, options, ...additionalPlugins) {
   return new GitHubWithPlugins(getOctokitOptions(token, options));
 }
 
+// src/version.ts
+var VERSION7 = true ? "1.0.0" : "0.0.0-dev";
+
 // src/config/load.ts
 var import_yaml = __toESM(require_dist(), 1);
 import fs4 from "node:fs";
@@ -40273,7 +40276,6 @@ function registerAllRules() {
 }
 
 // src/action.ts
-var VERSION7 = "0.1.0";
 function pullRequestContext() {
   const pr = context2.payload.pull_request;
   if (!pr) return void 0;

@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import * as core from '@actions/core';
 import * as github from '@actions/github';
+import { VERSION } from './version.js';
 import { loadConfig, ConfigError } from './config/load.js';
 import { run } from './engine/run.js';
 import { exitCode } from './engine/score.js';
@@ -10,8 +11,6 @@ import { diffText, fetchBaseRef, revParse, GitError } from './diff/git.js';
 import { registerAllRules } from './rules/register.js';
 import type { FailOn, CommentMode } from './config/schema.js';
 import type { AnalysisResult } from './types.js';
-
-const VERSION = '0.1.0';
 
 interface PrContext {
   owner: string;

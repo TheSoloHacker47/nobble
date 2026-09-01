@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import { parseArgs } from 'node:util';
+import { VERSION } from './version.js';
 import { loadConfig, ConfigError } from './config/load.js';
 import { run } from './engine/run.js';
 import { exitCode } from './engine/score.js';
@@ -11,8 +12,6 @@ import { renderSarif } from './report/sarif.js';
 import { registerAllRules } from './rules/register.js';
 import { isGitRepo, resolveBase, diffText, GitError } from './diff/git.js';
 import type { FailOn } from './config/schema.js';
-
-const VERSION = '0.1.0';
 
 const HELP = `
 nobble - catches nobbled tests

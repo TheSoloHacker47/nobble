@@ -6,6 +6,7 @@ import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const root = path.resolve(import.meta.dirname, '..');
+const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 const dist = path.join(root, 'dist');
 const wasmOut = path.join(dist, 'wasm');
 
@@ -31,6 +32,9 @@ fs.copyFileSync(
 // --- bundle ------------------------------------------------------------------
 const shared = {
   bundle: true,
+  // package.json is the single source of truth for the version. Hardcoding it in the
+  // sources is how `--version` ends up disagreeing with the published package.
+  define: { __NOBBLE_VERSION__: JSON.stringify(pkg.version) },
   platform: 'node',
   target: 'node20',
   format: 'esm',

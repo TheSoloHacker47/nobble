@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/TheSoloHacker47/nobble/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSoloHacker47/nobble/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/nobble.svg)](https://www.npmjs.com/package/nobble)
-[![license](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/TheSoloHacker47/nobble/blob/main/LICENSE)
 
 **Catches nobbled tests.** Nobble reads a pull request diff and flags changes where the
 tests were weakened to make the code pass, rather than the code being fixed to make the
@@ -11,7 +11,7 @@ tests pass.
 To nobble is to tamper with a racehorse before a race so it cannot win. That is precisely
 what happens to a test suite when someone edits it to stop it failing.
 
-[![Nobble flagging five weakened tests on a pull request](docs/pr-comment.png)](https://github.com/TheSoloHacker47/nobble/pull/1)
+[![Nobble flagging five weakened tests on a pull request](https://raw.githubusercontent.com/TheSoloHacker47/nobble/main/docs/pr-comment.png)](https://github.com/TheSoloHacker47/nobble/pull/1)
 
 <sub>A real comment from [pull request #1](https://github.com/TheSoloHacker47/nobble/pull/1), which weakens the payment suite on purpose. The critical finding is a mock introduced around `current_user`.</sub>
 
@@ -209,7 +209,7 @@ Nobble detects tampering with the coverage _configuration_ but never measures co
 **AI code review bots** send your diff to a model and return prose. Nobble makes no network
 calls, runs no inference, and sends your code nowhere. Same input, same output, every time.
 
-It targets exactly one failure mode. Everything in §2 of the [spec](nobble-spec.md) —
+It targets exactly one failure mode. Everything in §2 of the [spec](https://github.com/TheSoloHacker47/nobble/blob/main/nobble-spec.md) —
 detecting AI authorship, style scoring, running your tests, auto-fixing — is deliberately
 out of scope.
 
@@ -260,8 +260,8 @@ is the same shape: implement `LanguageAdapter`, register it, change nothing else
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Every rule needs at least three positive and three
-negative fixtures; the negatives are the ones that matter. [DECISIONS.md](DECISIONS.md)
+See [CONTRIBUTING.md](https://github.com/TheSoloHacker47/nobble/blob/main/CONTRIBUTING.md). Every rule needs at least three positive and three
+negative fixtures; the negatives are the ones that matter. [DECISIONS.md](https://github.com/TheSoloHacker47/nobble/blob/main/DECISIONS.md)
 records every ambiguity resolved while building this, including the two places the original
 spec turned out to be wrong about the world.
 

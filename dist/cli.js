@@ -10139,6 +10139,9 @@ var init_python = __esm({
 import fs5 from "node:fs";
 import { parseArgs } from "node:util";
 
+// src/version.ts
+var VERSION = true ? "1.0.0" : "0.0.0-dev";
+
 // src/config/load.ts
 var import_yaml = __toESM(require_dist(), 1);
 import fs2 from "node:fs";
@@ -16235,7 +16238,6 @@ function registerAllRules() {
 }
 
 // src/cli.ts
-var VERSION = "0.1.0";
 var HELP = `
 nobble - catches nobbled tests
 
