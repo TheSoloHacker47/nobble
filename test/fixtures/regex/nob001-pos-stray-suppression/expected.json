@@ -1,0 +1,9 @@
+{
+  "note": "A reasonless suppression is reported even when it matched no finding",
+  "findings": [
+    {
+      "ruleId": "NOB-001",
+      "file": "src/pay.test.ts"
+    }
+  ]
+}

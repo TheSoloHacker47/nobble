@@ -1,0 +1,10 @@
+{
+  "note": "A dependency walked back a major version",
+  "findings": [
+    {
+      "ruleId": "NOB-404",
+      "file": "package.json",
+      "messageContains": "downgraded from major 4 to 2"
+    }
+  ]
+}

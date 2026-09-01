@@ -1,0 +1,4 @@
+{
+  "note": "A file with no suppression comments produces no NOB-001",
+  "findings": []
+}

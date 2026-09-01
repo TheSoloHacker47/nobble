@@ -1,0 +1,9 @@
+{
+  "note": "time.sleep added to a python test",
+  "findings": [
+    {
+      "ruleId": "NOB-303",
+      "file": "tests/test_pay.py"
+    }
+  ]
+}

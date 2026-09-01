@@ -1,0 +1,10 @@
+{
+  "note": "coveragerc fail_under lowered",
+  "findings": [
+    {
+      "ruleId": "NOB-401",
+      "file": ".coveragerc",
+      "messageContains": "lowered from 80 to 60"
+    }
+  ]
+}

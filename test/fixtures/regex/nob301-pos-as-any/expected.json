@@ -1,0 +1,10 @@
+{
+  "note": "as any cast added",
+  "findings": [
+    {
+      "ruleId": "NOB-301",
+      "file": "src/pay.ts",
+      "messageContains": "as any"
+    }
+  ]
+}

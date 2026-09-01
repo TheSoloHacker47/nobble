@@ -1,0 +1,15 @@
+{
+  "note": "Two dependencies downgraded gives two findings",
+  "findings": [
+    {
+      "ruleId": "NOB-404",
+      "file": "package.json",
+      "messageContains": "vitest"
+    },
+    {
+      "ruleId": "NOB-404",
+      "file": "package.json",
+      "messageContains": "eslint"
+    }
+  ]
+}

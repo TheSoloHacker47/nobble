@@ -1,0 +1,10 @@
+{
+  "note": "Lockfile integrity hashes removed with nothing put back",
+  "findings": [
+    {
+      "ruleId": "NOB-404",
+      "file": "package-lock.json",
+      "messageContains": "integrity"
+    }
+  ]
+}

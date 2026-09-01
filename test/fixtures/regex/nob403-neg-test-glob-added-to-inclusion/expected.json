@@ -1,0 +1,4 @@
+{
+  "note": "Adding a test glob to an INCLUSION list is the opposite of excluding it",
+  "findings": []
+}

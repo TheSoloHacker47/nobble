@@ -1,0 +1,10 @@
+{
+  "note": "An empty catch added around code that used to propagate",
+  "findings": [
+    {
+      "ruleId": "NOB-302",
+      "file": "src/pay.ts",
+      "messageContains": "Empty"
+    }
+  ]
+}

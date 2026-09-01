@@ -1,0 +1,177 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`markdown reporter > renders the sticky comment structure 1`] = `
+"<!-- nobble -->
+### 🐎 Nobble: 2 findings (score 65, verdict: block)
+
+| Severity | Rule | Location | What happened |
+|---|---|---|---|
+| 🔴 critical | NOB-402 | \`.github/workflows/ci.yml:8\` | CI check neutralized (continue-on-error: true) |
+| 🟠 high | NOB-104 | \`spec/payments_spec.rb:12\` | Test skipped (RSpec skip/pending): \`pending\` |
+
+<details><summary>Details and how to suppress</summary>
+
+#### 🔴 NOB-402 — Test or check step neutralized in CI
+
+\`.github/workflows/ci.yml:8\` · severity \`critical\` · weight 40
+
+CI check neutralized (continue-on-error: true)
+
+\`\`\`diff
++ continue-on-error: true
+\`\`\`
+
+*Why this rule exists:* A CI step that cannot fail is not a check. This disables enforcement for the entire repository, not just one test.
+
+To suppress, add this comment above the line (a reason is required):
+
+\`\`\`
+# nobble-ignore NOB-402: <reason>
+\`\`\`
+
+---
+
+#### 🟠 NOB-104 — Test disabled or skipped
+
+\`spec/payments_spec.rb:12\` · severity \`high\` · weight 25
+
+Test skipped (RSpec skip/pending): \`pending\`
+
+\`\`\`diff
+- it "charges the card" do
++ pending
+\`\`\`
+
+*Why this rule exists:* A skipped test is a test that cannot fail. Skipping is the cheapest way to make a red suite green without changing any behaviour.
+
+To suppress, add this comment above the line (a reason is required):
+
+\`\`\`
+# nobble-ignore NOB-104: <reason>
+\`\`\`
+
+---
+
+</details>
+"
+`;
+
+exports[`sarif reporter > renders valid SARIF 2.1.0 1`] = `
+"{
+  "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+  "version": "2.1.0",
+  "runs": [
+    {
+      "tool": {
+        "driver": {
+          "name": "Nobble",
+          "informationUri": "https://github.com/TheSoloHacker47/nobble",
+          "version": "1.0.0",
+          "rules": [
+            {
+              "id": "NOB-104",
+              "name": "NOB104",
+              "shortDescription": {
+                "text": "Test disabled or skipped"
+              },
+              "fullDescription": {
+                "text": "A skipped test is a test that cannot fail. Skipping is the cheapest way to make a red suite green without changing any behaviour."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "nobble",
+                  "test-integrity"
+                ],
+                "security-severity": "75",
+                "severity": "high",
+                "weight": 25
+              }
+            },
+            {
+              "id": "NOB-402",
+              "name": "NOB402",
+              "shortDescription": {
+                "text": "Test or check step neutralized in CI"
+              },
+              "fullDescription": {
+                "text": "A CI step that cannot fail is not a check. This disables enforcement for the entire repository, not just one test."
+              },
+              "defaultConfiguration": {
+                "level": "error"
+              },
+              "properties": {
+                "tags": [
+                  "nobble",
+                  "test-integrity"
+                ],
+                "security-severity": "100",
+                "severity": "critical",
+                "weight": 40
+              }
+            }
+          ]
+        }
+      },
+      "results": [
+        {
+          "ruleId": "NOB-402",
+          "level": "error",
+          "message": {
+            "text": "CI check neutralized (continue-on-error: true)"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": ".github/workflows/ci.yml"
+                },
+                "region": {
+                  "startLine": 8
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "nobbleFingerprint": "d033448ea002996ec988cb700220e1e7"
+          },
+          "properties": {
+            "severity": "critical",
+            "weight": 40
+          }
+        },
+        {
+          "ruleId": "NOB-104",
+          "level": "error",
+          "message": {
+            "text": "Test skipped (RSpec skip/pending): \`pending\`"
+          },
+          "locations": [
+            {
+              "physicalLocation": {
+                "artifactLocation": {
+                  "uri": "spec/payments_spec.rb"
+                },
+                "region": {
+                  "startLine": 12
+                }
+              }
+            }
+          ],
+          "partialFingerprints": {
+            "nobbleFingerprint": "43d1f61f10c72651abf8a1762329a503"
+          },
+          "properties": {
+            "severity": "high",
+            "weight": 25
+          }
+        }
+      ],
+      "columnKind": "utf16CodeUnits"
+    }
+  ]
+}
+"
+`;

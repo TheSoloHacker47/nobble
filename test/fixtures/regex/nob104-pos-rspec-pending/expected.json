@@ -1,0 +1,10 @@
+{
+  "note": "RSpec example turned into a pending stub",
+  "findings": [
+    {
+      "ruleId": "NOB-104",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "RSpec skip/pending"
+    }
+  ]
+}

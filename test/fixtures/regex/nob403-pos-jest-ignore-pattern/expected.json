@@ -1,0 +1,9 @@
+{
+  "note": "A test directory added to testPathIgnorePatterns",
+  "findings": [
+    {
+      "ruleId": "NOB-403",
+      "file": "jest.config.js"
+    }
+  ]
+}

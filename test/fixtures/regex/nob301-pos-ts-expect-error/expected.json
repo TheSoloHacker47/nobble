@@ -1,0 +1,10 @@
+{
+  "note": "@ts-expect-error added to silence the type checker",
+  "findings": [
+    {
+      "ruleId": "NOB-301",
+      "file": "src/pay.ts",
+      "messageContains": "@ts-expect-error"
+    }
+  ]
+}

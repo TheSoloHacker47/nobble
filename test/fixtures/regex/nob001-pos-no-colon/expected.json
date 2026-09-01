@@ -1,0 +1,13 @@
+{
+  "note": "A suppression with no colon at all is also unexplained",
+  "findings": [
+    {
+      "ruleId": "NOB-104",
+      "file": "src/pay.test.ts"
+    },
+    {
+      "ruleId": "NOB-001",
+      "file": "src/pay.test.ts"
+    }
+  ]
+}

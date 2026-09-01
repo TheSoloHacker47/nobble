@@ -1,0 +1,4 @@
+{
+  "note": "MANDATORY NEGATIVE: a flaky test correctly fixed by replacing a sleep with a real wait",
+  "findings": []
+}

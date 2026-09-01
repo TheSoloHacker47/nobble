@@ -107,6 +107,28 @@ on its own).
 **Decision:** use both instead of adding `commander` and `picocolors`. Runtime dependency count is
 **7 of a permitted 10**.
 
+### A6. `paths.*` replaces defaults; `rules['NOB-201'].symbols` appends
+
+§8's example config sets `paths.tests` to `["spec/**", "**/*.test.ts"]` and annotates only
+the NOB-201 symbol list with "appended to defaults". It never says what the path lists do.
+
+**Decision:** `paths.tests`, `paths.security`, and `paths.ignore` **replace** the built-in
+globs when provided; `rules['NOB-201'].symbols` **appends**. The asymmetry is the spec's
+own: it annotated the one case that appends, which implies the others do not. Replacement
+also matches the example, which lists a narrow set that reads as "these, specifically"
+rather than "these as well".
+
+### A7. NOB-303 skips a file that also removed a sleep
+
+A change that adds a sleep in one place and removes one in another is almost always the
+flaky-test fix from §11.2's mandatory negative list, not a new band-aid.
+
+**Decision:** if any removed line in a file matches a sleep pattern, NOB-303 does not fire
+for that file at all. This gives up detecting a diff that genuinely swaps one sleep for
+another, which is a real but rare case, in exchange for never firing on the correct fix.
+Given that §11 makes the false-positive rate the project's primary quality measure, that
+trade is the right way round.
+
 ### A5. NOB-401 compares numbers positionally rather than parsing five config formats
 
 NOB-401 must detect a lowered threshold across `jest.config.*` (JS), `.coveragerc` (INI),

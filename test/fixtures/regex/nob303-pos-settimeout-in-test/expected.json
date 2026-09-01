@@ -1,0 +1,9 @@
+{
+  "note": "A raw sleep added to a test to paper over a race",
+  "findings": [
+    {
+      "ruleId": "NOB-303",
+      "file": "src/pay.test.ts"
+    }
+  ]
+}

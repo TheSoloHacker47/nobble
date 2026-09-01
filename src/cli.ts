@@ -5,6 +5,10 @@ import { loadConfig, ConfigError } from './config/load.js';
 import { run } from './engine/run.js';
 import { exitCode } from './engine/score.js';
 import { renderTerminal } from './report/terminal.js';
+import { renderJson } from './report/json.js';
+import { renderMarkdown } from './report/markdown.js';
+import { renderSarif } from './report/sarif.js';
+import { registerAllRules } from './rules/register.js';
 import { isGitRepo, resolveBase, diffText, GitError } from './diff/git.js';
 import type { FailOn } from './config/schema.js';
 
@@ -36,6 +40,7 @@ function readStdin(): string {
 }
 
 async function main(argv: string[]): Promise<number> {
+  registerAllRules();
   let parsed;
   try {
     parsed = parseArgs({
@@ -142,8 +147,19 @@ async function main(argv: string[]): Promise<number> {
       : undefined,
   });
 
-  // Reporters beyond terminal land in M2.
-  process.stdout.write(renderTerminal(result, { quiet: values.quiet }));
+  switch (format) {
+    case 'json':
+      process.stdout.write(renderJson(result));
+      break;
+    case 'markdown':
+      process.stdout.write(renderMarkdown(result));
+      break;
+    case 'sarif':
+      process.stdout.write(renderSarif(result, VERSION));
+      break;
+    default:
+      process.stdout.write(renderTerminal(result, { quiet: values.quiet }));
+  }
   return exitCode(result.verdict, config.failOn);
 }
 

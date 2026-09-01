@@ -3957,7 +3957,6 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs2 from "node:fs";
-var GRAMMARS = ["typescript", "tsx", "javascript", "python", "ruby"];
 function runtimeWasmPath() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const bundled = path.join(here, "wasm", "tree-sitter-runtime.wasm");
@@ -3969,7 +3968,6 @@ function runtimeWasmPath() {
     return void 0;
   }
 }
-var GRAMMAR_NAMES = GRAMMARS;
 
 // src/parsers/index.ts
 var initialized = false;
@@ -3980,9 +3978,543 @@ async function initParsers() {
   initialized = true;
 }
 
+// src/rules/index.ts
+var registry = [];
+function registerRule(rule) {
+  if (registry.some((r) => r.id === rule.id)) {
+    throw new Error(`duplicate rule id ${rule.id}`);
+  }
+  registry.push(rule);
+}
+
+// src/rules/nob001-unexplained-suppression.ts
+var nob001 = {
+  id: "NOB-001",
+  title: "Unexplained suppression",
+  defaultSeverity: "low",
+  weight: 5,
+  requiresAst: false,
+  appliesTo: [],
+  rationale: "A suppression without a reason is unreviewable. Requiring one keeps the escape hatch honest.",
+  run: () => []
+};
+
+// src/rules/helpers.ts
+function commentToken(filePath) {
+  const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
+  if ([".py", ".rb", ".yml", ".yaml", ".sh", ".toml", ".cfg", ".properties"].includes(ext)) {
+    return "#";
+  }
+  if (filePath.endsWith(".coveragerc") || filePath.endsWith(".simplecov")) return "#";
+  return "//";
+}
+function makeFinding(ctx, input) {
+  const token = commentToken(ctx.file.path);
+  const finding = {
+    ruleId: ctx.rule.id,
+    title: ctx.rule.title,
+    severity: ctx.rule.severity,
+    weight: ctx.rule.weight,
+    file: ctx.file.path,
+    line: input.line,
+    message: input.message,
+    evidence: {},
+    suppressWith: `${token} nobble-ignore ${ctx.rule.id}: <reason>`
+  };
+  if (input.endLine !== void 0) finding.endLine = input.endLine;
+  if (input.before !== void 0) finding.evidence.before = input.before;
+  if (input.after !== void 0) finding.evidence.after = input.after;
+  return finding;
+}
+function isCommentOnly(line) {
+  const t = line.trim();
+  return t === "" || t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*") || t.startsWith('"""') || t.startsWith("'''");
+}
+function extractNumbers(source, keys) {
+  const out2 = /* @__PURE__ */ new Map();
+  for (const rawLine of source.split("\n")) {
+    const line = rawLine.trim();
+    const keyMatch = keys.exec(line);
+    if (!keyMatch) continue;
+    const nums = [...line.matchAll(/(-?\d+(?:\.\d+)?)/g)].map((m) => Number(m[1]));
+    if (nums.length === 0) continue;
+    const key = keyMatch[0].toLowerCase().replace(/[^a-z_]/g, "");
+    out2.set(key, [...out2.get(key) ?? [], ...nums]);
+  }
+  return out2;
+}
+
+// src/rules/nob104-test-skipped.ts
+var PATTERNS = [
+  // JS/TS
+  {
+    re: /\b(?:it|test|describe|context|suite)\.(?:skip|todo|failing)\s*\(/,
+    label: "skipped block"
+  },
+  { re: /\bx(?:it|test|describe|context)\s*\(/, label: "x-prefixed skip" },
+  { re: /\b(?:it|test|describe)\.each\s*\(\s*\[\s*\]\s*\)/, label: "empty each table" },
+  { re: /\bthis\.skip\s*\(\s*\)/, label: "runtime skip" },
+  // Python
+  { re: /@(?:pytest\.mark\.)?(?:skip|skipif|xfail)\b/, label: "pytest skip marker" },
+  { re: /@unittest\.(?:skip|skipIf|skipUnless|expectedFailure)\b/, label: "unittest skip" },
+  { re: /\bpytest\.skip\s*\(/, label: "pytest.skip call" },
+  { re: /\bself\.skipTest\s*\(/, label: "skipTest call" },
+  // Ruby
+  { re: /^\s*(?:skip|pending)\b(?!\w)/, label: "RSpec skip/pending" },
+  {
+    re: /\b(?:it|describe|context|specify)\s+.*,\s*(?:skip|pending):\s*(?:true|["'])/,
+    label: "RSpec skip option"
+  },
+  { re: /\bx(?:it|describe|context|specify)\s+/, label: "RSpec x-prefixed skip" },
+  // Go
+  { re: /\bt\.Skip(?:Now|f)?\s*\(/, label: "t.Skip()" },
+  // JVM
+  { re: /@(?:Ignore|Disabled)\b/, label: "@Ignore/@Disabled" }
+];
+var nob104 = {
+  id: "NOB-104",
+  title: "Test disabled or skipped",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: false,
+  appliesTo: ["test"],
+  rationale: "A skipped test is a test that cannot fail. Skipping is the cheapest way to make a red suite green without changing any behaviour.",
+  run(ctx) {
+    const findings = [];
+    for (const line of ctx.addedLines) {
+      if (isCommentOnly(line.text)) continue;
+      for (const { re, label } of PATTERNS) {
+        if (!re.test(line.text)) continue;
+        findings.push(
+          makeFinding(ctx, {
+            line: line.line,
+            message: `Test skipped (${label}): \`${line.text.trim()}\``,
+            after: line.text
+          })
+        );
+        break;
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob301-suppression-added.ts
+var COMMENT_DIRECTIVES = [
+  { re: /@ts-ignore\b/, label: "@ts-ignore" },
+  { re: /@ts-expect-error\b/, label: "@ts-expect-error" },
+  { re: /@ts-nocheck\b/, label: "@ts-nocheck" },
+  { re: /eslint-disable(?:-next-line|-line)?\b/, label: "eslint-disable" },
+  { re: /\brubocop:disable\b/, label: "rubocop:disable" },
+  { re: /#\s*type:\s*ignore\b/, label: "# type: ignore" },
+  { re: /#\s*noqa\b/, label: "# noqa" },
+  { re: /#pragma\s+warning\s+disable\b/, label: "#pragma warning disable" },
+  { re: /\bnolint\b/, label: "nolint" }
+];
+var CODE_SUPPRESSIONS = [
+  { re: /\bas\s+any\b/, label: "as any" },
+  { re: /\bas\s+unknown\s+as\b/, label: "as unknown as" }
+];
+var COLON_ANY = /:\s*any\b/;
+var nob301 = {
+  id: "NOB-301",
+  title: "Type or lint suppression added",
+  defaultSeverity: "medium",
+  weight: 10,
+  requiresAst: false,
+  appliesTo: ["test", "source"],
+  rationale: "Silencing the type checker or linter removes the signal that something is wrong, rather than addressing it.",
+  run(ctx) {
+    for (const line of ctx.addedLines) {
+      const text = line.text;
+      for (const { re, label } of COMMENT_DIRECTIVES) {
+        if (!re.test(text)) continue;
+        return [
+          makeFinding(ctx, {
+            line: line.line,
+            message: `Suppression added (${label}): \`${text.trim()}\``,
+            after: text
+          })
+        ];
+      }
+      if (isCommentOnly(text)) continue;
+      for (const { re, label } of CODE_SUPPRESSIONS) {
+        if (!re.test(text)) continue;
+        return [
+          makeFinding(ctx, {
+            line: line.line,
+            message: `Suppression added (${label}): \`${text.trim()}\``,
+            after: text
+          })
+        ];
+      }
+      if (COLON_ANY.test(text) && /\b(let|const|var|function|readonly|private|public|\()/.test(text)) {
+        return [
+          makeFinding(ctx, {
+            line: line.line,
+            message: `Suppression added (\`: any\` annotation): \`${text.trim()}\``,
+            after: text
+          })
+        ];
+      }
+    }
+    return [];
+  }
+};
+
+// src/rules/nob302-exception-swallowed.ts
+var CATCH_OPENERS = [
+  { re: /\bcatch\s*(?:\([^)]*\))?\s*\{/, label: "catch" },
+  { re: /\bexcept\b[^:]*:\s*$/, label: "except" },
+  { re: /\brescue\b[^\n]*$/, label: "rescue" }
+];
+var LOG_ONLY = /^\s*(?:\/\/|#|\*)|^\s*(?:console\.\w+|logger?\.\w+|log\.\w+|print|puts|pp|warnings\.warn|System\.out\.\w+)\s*\(|^\s*pass\s*$|^\s*nil\s*$|^\s*null\s*$|^\s*;?\s*$/;
+var REAL_HANDLING = /\b(throw|raise|return|reject|exit|abort|process\.exit|res\.status|next\s*\(|Sentry|captureException|reportError|report_error|rollback|retry|fail\b|assert)\b/;
+function bodyLines(source, openIndex, isBrace) {
+  const lines = source.split("\n");
+  const out2 = [];
+  if (isBrace) {
+    const openLine2 = lines[openIndex] ?? "";
+    const startCol = openLine2.lastIndexOf("{");
+    if (startCol === -1) return out2;
+    let depth = 0;
+    for (let i2 = openIndex; i2 < lines.length && i2 < openIndex + 40; i2++) {
+      const line = lines[i2];
+      const from = i2 === openIndex ? startCol : 0;
+      let closedAt = -1;
+      for (let c = from; c < line.length; c++) {
+        const ch = line[c];
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+          depth--;
+          if (depth === 0) {
+            closedAt = c;
+            break;
+          }
+        }
+      }
+      if (i2 > openIndex) out2.push(line);
+      else if (closedAt > startCol + 1) {
+        out2.push(line.slice(startCol + 1, closedAt));
+      }
+      if (depth === 0) break;
+    }
+    if (out2.length && /^\s*\}/.test(out2[out2.length - 1])) out2.pop();
+    return out2;
+  }
+  const openLine = lines[openIndex] ?? "";
+  const indent = openLine.length - openLine.trimStart().length;
+  for (let i2 = openIndex + 1; i2 < lines.length && i2 < openIndex + 40; i2++) {
+    const line = lines[i2];
+    if (line.trim() === "") {
+      out2.push(line);
+      continue;
+    }
+    const lineIndent = line.length - line.trimStart().length;
+    if (lineIndent <= indent) break;
+    out2.push(line);
+  }
+  return out2;
+}
+var nob302 = {
+  id: "NOB-302",
+  title: "Broad exception swallow added",
+  defaultSeverity: "medium",
+  weight: 15,
+  requiresAst: false,
+  appliesTo: ["test", "source"],
+  rationale: "An empty or log-only catch turns a failure into silence. The code keeps running in a state nobody checked.",
+  run(ctx) {
+    const after = ctx.after?.source;
+    if (!after) return [];
+    const afterLines = after.split("\n");
+    const findings = [];
+    for (const added of ctx.addedLines) {
+      const text = added.text;
+      if (isCommentOnly(text)) continue;
+      const opener = CATCH_OPENERS.find(({ re }) => re.test(text));
+      if (!opener) continue;
+      if (REAL_HANDLING.test(text.replace(/\brescue\b|\bexcept\b|\bcatch\b/, ""))) continue;
+      const idx = added.line - 1;
+      if (afterLines[idx]?.trim() !== text.trim()) continue;
+      const body2 = bodyLines(after, idx, opener.label === "catch");
+      const meaningful = body2.filter((l) => l.trim() !== "");
+      const swallowed = meaningful.length === 0 || meaningful.every((l) => LOG_ONLY.test(l) && !REAL_HANDLING.test(l));
+      if (!swallowed) continue;
+      findings.push(
+        makeFinding(ctx, {
+          line: added.line,
+          endLine: added.line + body2.length,
+          message: meaningful.length === 0 ? `Empty \`${opener.label}\` block added: the error is discarded silently.` : `\`${opener.label}\` block added that only logs: the error is swallowed.`,
+          after: [text, ...meaningful.slice(0, 2)].join("\n")
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob303-timing-bandaid.ts
+var SLEEP_PATTERNS = [
+  {
+    re: /\bawait\s+new\s+Promise\s*\(\s*\w*\s*=>\s*setTimeout\b/,
+    label: "await new Promise(setTimeout)"
+  },
+  { re: /\bsetTimeout\s*\(/, label: "setTimeout" },
+  { re: /\btime\.sleep\s*\(/, label: "time.sleep" },
+  { re: /\basyncio\.sleep\s*\(/, label: "asyncio.sleep" },
+  { re: /(?<![.\w])sleep\s*[( ]\s*\d/, label: "sleep" },
+  { re: /\bThread\.sleep\s*\(/, label: "Thread.sleep" },
+  { re: /\bdelay\s*\(\s*\d+\s*\)/, label: "delay" }
+];
+var PROPER_WAIT = /\b(waitFor|waitUntil|waitForElement|findBy|toEventually|wait_for|eventually|poll_until|until\s*\()/i;
+var RETRY_CONTEXT = /\b(retry|retries|attempt|backoff|poll)\b/i;
+var nob303 = {
+  id: "NOB-303",
+  title: "Timing band-aid added",
+  defaultSeverity: "low",
+  weight: 8,
+  requiresAst: false,
+  appliesTo: ["test", "source"],
+  rationale: "A fixed sleep is the usual workaround for a race condition the author did not understand. It makes the suite slower and still flaky.",
+  run(ctx) {
+    const removedASleep = ctx.removedLines.some(
+      (l) => SLEEP_PATTERNS.some(({ re }) => re.test(l.text))
+    );
+    if (removedASleep) return [];
+    const findings = [];
+    for (const line of ctx.addedLines) {
+      const text = line.text;
+      if (isCommentOnly(text)) continue;
+      if (PROPER_WAIT.test(text)) continue;
+      if (ctx.file.kind !== "test" && !RETRY_CONTEXT.test(text)) continue;
+      for (const { re, label } of SLEEP_PATTERNS) {
+        if (!re.test(text)) continue;
+        findings.push(
+          makeFinding(ctx, {
+            line: line.line,
+            message: `Timing band-aid added (${label}): \`${text.trim()}\``,
+            after: text
+          })
+        );
+        break;
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob401-coverage-lowered.ts
+var THRESHOLD_KEYS = /\b(coverageThreshold|statements|branches|functions|lines|fail_under|minimum_coverage|min_coverage|minimum|coverage|check_coverage|per_file|global|watermarks|sonar\.coverage\.\w+|target|threshold)\b/i;
+var IGNORE_LINE = /\b(version|port|timeout|maxWorkers|node|python|ruby|cache|id|seed)\b/i;
+var nob401 = {
+  id: "NOB-401",
+  title: "Coverage threshold lowered",
+  defaultSeverity: "high",
+  weight: 30,
+  requiresAst: false,
+  appliesTo: ["coverage_config"],
+  rationale: "Lowering the bar is not the same as clearing it. A dropped threshold lets uncovered code through without anyone deciding to allow it.",
+  run(ctx) {
+    if (!ctx.before?.source || !ctx.after?.source) return [];
+    const before = extractNumbers(
+      ctx.before.source.split("\n").filter((l) => !IGNORE_LINE.test(l)).join("\n"),
+      THRESHOLD_KEYS
+    );
+    const after = extractNumbers(
+      ctx.after.source.split("\n").filter((l) => !IGNORE_LINE.test(l)).join("\n"),
+      THRESHOLD_KEYS
+    );
+    const findings = [];
+    for (const [key, beforeNums] of before) {
+      const afterNums = after.get(key);
+      if (!afterNums) continue;
+      const beforeMax = Math.max(...beforeNums);
+      const afterMax = Math.max(...afterNums);
+      if (afterMax >= beforeMax) continue;
+      const changed = ctx.addedLines.find((l) => new RegExp(key, "i").test(l.text));
+      const removed = ctx.removedLines.find((l) => new RegExp(key, "i").test(l.text));
+      findings.push(
+        makeFinding(ctx, {
+          line: changed?.line ?? ctx.addedLines[0]?.line ?? 1,
+          message: `Coverage threshold \`${key}\` lowered from ${beforeMax} to ${afterMax}.`,
+          before: removed?.text,
+          after: changed?.text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob402-ci-neutralized.ts
+var CHECK_COMMAND = /\b(test|spec|lint|audit|typecheck|tsc|mypy|rubocop|eslint|pytest|jest|vitest|rspec|check)\b/i;
+var NEUTRALIZERS = [
+  { re: /continue-on-error\s*:\s*true/i, label: "continue-on-error: true" },
+  { re: /\|\|\s*true\s*$/, label: "|| true" },
+  { re: /;\s*exit\s+0\s*$/, label: "; exit 0" },
+  { re: /--passWithNoTests\b/, label: "--passWithNoTests" },
+  { re: /--maxfail=0\b/, label: "--maxfail=0" },
+  { re: /(?:^|\s)--force(?:\s|$)/, label: "--force" },
+  { re: /\|\|\s*:\s*$/, label: "|| :" },
+  { re: /\bset\s+\+e\b/, label: "set +e" },
+  { re: /if:\s*(?:false|never\(\))/i, label: "if: false" }
+];
+var nob402 = {
+  id: "NOB-402",
+  title: "Test or check step neutralized in CI",
+  defaultSeverity: "critical",
+  weight: 40,
+  requiresAst: false,
+  appliesTo: ["ci_config"],
+  rationale: "A CI step that cannot fail is not a check. This disables enforcement for the entire repository, not just one test.",
+  run(ctx) {
+    const findings = [];
+    for (const line of ctx.addedLines) {
+      const text = line.text;
+      for (const { re, label } of NEUTRALIZERS) {
+        if (!re.test(text)) continue;
+        const standalone = label === "continue-on-error: true" || label === "if: false";
+        if (!standalone && !CHECK_COMMAND.test(text)) continue;
+        findings.push(
+          makeFinding(ctx, {
+            line: line.line,
+            message: `CI check neutralized (${label}): \`${text.trim()}\``,
+            after: text
+          })
+        );
+        break;
+      }
+    }
+    const addedText = ctx.addedLines.map((l) => l.text).join("\n");
+    for (const line of ctx.removedLines) {
+      if (!/^\s*-?\s*run\s*:/.test(line.text)) continue;
+      if (!CHECK_COMMAND.test(line.text)) continue;
+      const command = line.text.replace(/^\s*-?\s*run\s*:\s*/, "").trim();
+      if (!command) continue;
+      if (addedText.includes(command)) continue;
+      findings.push(
+        makeFinding(ctx, {
+          line: line.line,
+          message: `CI step running a check was removed: \`${command}\``,
+          before: line.text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob403-test-excluded.ts
+var EXCLUSION_KEYS = /\b(testPathIgnorePatterns|coveragePathIgnorePatterns|modulePathIgnorePatterns|testIgnore|exclude|ignore|omit|norecursedirs|collectCoverageFrom|testMatch|testRegex|--ignore|--exclude|--testPathIgnorePatterns|skip_dirs)\b/;
+var TEST_SHAPED = /(^|[/\\"'`\s(])(?:tests?|specs?|__tests__|e2e|integration)([/\\"'`\s),]|$)|[._-](?:test|spec)[._-]?|\*\.(?:test|spec)\./i;
+var EXCLUSION_FILES = /(^|\/)(\.eslintignore|\.prettierignore|\.rspec|\.npmignore|\.gitignore)$/;
+var nob403 = {
+  id: "NOB-403",
+  title: "Test file excluded from tooling",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: false,
+  appliesTo: ["coverage_config", "ci_config", "other", "source"],
+  rationale: "An excluded test still exists in the repository, so nothing looks missing, but it no longer runs.",
+  run(ctx) {
+    const isExclusionFile = EXCLUSION_FILES.test(ctx.file.path);
+    if (!isExclusionFile && ctx.file.kind === "source") return [];
+    if (!isExclusionFile && ctx.file.kind === "other") return [];
+    const findings = [];
+    for (const line of ctx.addedLines) {
+      const text = line.text;
+      const onExclusionKey = EXCLUSION_KEYS.test(text);
+      if (!isExclusionFile && !onExclusionKey) continue;
+      if (!TEST_SHAPED.test(text)) continue;
+      if (/\b(testMatch|testRegex|collectCoverageFrom)\b/.test(text) && !/!/.test(text)) continue;
+      findings.push(
+        makeFinding(ctx, {
+          line: line.line,
+          message: `Test path excluded from tooling: \`${text.trim()}\``,
+          after: text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob404-dependency-weakened.ts
+var INTEGRITY_FIELD = /^\s*"?(integrity|resolved|checksum)"?\s*[:=]/;
+var DEP_LINE = /^\s*"?([@\w][\w./-]*)"?\s*[:=]\s*"?([\^~>=<]*\s*v?)(\d+)\.(\d+)\.(\d+)/;
+var nob404 = {
+  id: "NOB-404",
+  title: "Dependency pinned down or integrity check removed",
+  defaultSeverity: "medium",
+  weight: 15,
+  requiresAst: false,
+  appliesTo: ["coverage_config", "other", "source"],
+  rationale: "Removing an integrity hash disables tamper detection. Downgrading a major version avoids adapting to a breaking change rather than handling it.",
+  run(ctx) {
+    const name2 = ctx.file.path.split("/").pop() ?? "";
+    const isLockfile = /^(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|Gemfile\.lock|poetry\.lock|Cargo\.lock)$/.test(
+      name2
+    );
+    const isManifest = /^(package\.json|Gemfile|pyproject\.toml|requirements\.txt|Cargo\.toml)$/.test(name2);
+    if (!isLockfile && !isManifest) return [];
+    const findings = [];
+    if (isLockfile) {
+      const addedIntegrity = ctx.addedLines.filter((l) => INTEGRITY_FIELD.test(l.text)).length;
+      const removedIntegrity = ctx.removedLines.filter((l) => INTEGRITY_FIELD.test(l.text));
+      if (removedIntegrity.length > addedIntegrity) {
+        const first = removedIntegrity[0];
+        findings.push(
+          makeFinding(ctx, {
+            line: ctx.addedLines[0]?.line ?? 1,
+            message: `${removedIntegrity.length - addedIntegrity} integrity field(s) removed from ${name2} without replacement.`,
+            before: first.text
+          })
+        );
+      }
+    }
+    if (isManifest) {
+      const versions = (lines) => {
+        const m = /* @__PURE__ */ new Map();
+        for (const l of lines) {
+          const match = DEP_LINE.exec(l.text);
+          if (!match) continue;
+          m.set(match[1], { major: Number(match[3]), line: l.line, text: l.text });
+        }
+        return m;
+      };
+      const before = versions(ctx.removedLines);
+      const after = versions(ctx.addedLines);
+      for (const [dep, a] of after) {
+        const b = before.get(dep);
+        if (!b || a.major >= b.major) continue;
+        findings.push(
+          makeFinding(ctx, {
+            line: a.line,
+            message: `Dependency \`${dep}\` downgraded from major ${b.major} to ${a.major}.`,
+            before: b.text,
+            after: a.text
+          })
+        );
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/register.ts
+var done = false;
+function registerAllRules() {
+  if (done) return;
+  done = true;
+  for (const rule of [nob001, nob104, nob301, nob302, nob303, nob401, nob402, nob403, nob404]) {
+    registerRule(rule);
+  }
+}
+
 // src/action.ts
 async function main() {
+  registerAllRules();
   await initParsers();
-  console.log(`nobble action: ${GRAMMAR_NAMES.length} grammars available`);
 }
 void main();

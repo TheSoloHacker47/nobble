@@ -1,0 +1,9 @@
+{
+  "note": "A well-formed suppression naming a different rule leaves this finding alone",
+  "findings": [
+    {
+      "ruleId": "NOB-104",
+      "file": "src/pay.test.ts"
+    }
+  ]
+}

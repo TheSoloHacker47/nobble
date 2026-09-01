@@ -1,0 +1,10 @@
+{
+  "note": "The lint step was deleted outright",
+  "findings": [
+    {
+      "ruleId": "NOB-402",
+      "file": ".github/workflows/ci.yml",
+      "messageContains": "was removed"
+    }
+  ]
+}

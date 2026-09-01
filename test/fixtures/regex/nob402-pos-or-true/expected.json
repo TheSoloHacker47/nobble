@@ -1,0 +1,10 @@
+{
+  "note": "|| true appended to a test command",
+  "findings": [
+    {
+      "ruleId": "NOB-402",
+      "file": ".github/workflows/ci.yml",
+      "messageContains": "|| true"
+    }
+  ]
+}

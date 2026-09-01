@@ -1,0 +1,10 @@
+{
+  "note": "Jest test switched to it.skip",
+  "findings": [
+    {
+      "ruleId": "NOB-104",
+      "file": "src/pay.test.ts",
+      "messageContains": "skipped block"
+    }
+  ]
+}

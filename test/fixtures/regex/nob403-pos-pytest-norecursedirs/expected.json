@@ -1,0 +1,9 @@
+{
+  "note": "Test dir added to norecursedirs",
+  "findings": [
+    {
+      "ruleId": "NOB-403",
+      "file": "setup.cfg"
+    }
+  ]
+}

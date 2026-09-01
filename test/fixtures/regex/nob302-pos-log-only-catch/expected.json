@@ -1,0 +1,10 @@
+{
+  "note": "A catch that only logs still swallows the failure",
+  "findings": [
+    {
+      "ruleId": "NOB-302",
+      "file": "src/pay.ts",
+      "messageContains": "only logs"
+    }
+  ]
+}

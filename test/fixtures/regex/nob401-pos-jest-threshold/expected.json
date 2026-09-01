@@ -1,0 +1,10 @@
+{
+  "note": "Jest global coverage threshold dropped",
+  "findings": [
+    {
+      "ruleId": "NOB-401",
+      "file": "jest.config.js",
+      "messageContains": "lowered from 90 to 45"
+    }
+  ]
+}

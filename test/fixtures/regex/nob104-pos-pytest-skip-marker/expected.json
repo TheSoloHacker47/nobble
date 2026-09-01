@@ -1,0 +1,10 @@
+{
+  "note": "pytest skip marker added above a test",
+  "findings": [
+    {
+      "ruleId": "NOB-104",
+      "file": "tests/test_pay.py",
+      "messageContains": "pytest skip marker"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "note": "A suppression with a real reason silences the finding and reports nothing itself",
+  "findings": []
+}

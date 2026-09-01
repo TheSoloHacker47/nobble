@@ -1,0 +1,10 @@
+{
+  "note": "pyproject fail_under lowered",
+  "findings": [
+    {
+      "ruleId": "NOB-401",
+      "file": "pyproject.toml",
+      "messageContains": "lowered from 85 to 50"
+    }
+  ]
+}

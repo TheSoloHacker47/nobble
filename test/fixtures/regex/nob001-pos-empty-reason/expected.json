@@ -1,0 +1,14 @@
+{
+  "note": "A suppression with nothing after the colon: the original finding survives AND NOB-001 fires",
+  "findings": [
+    {
+      "ruleId": "NOB-104",
+      "file": "src/pay.test.ts"
+    },
+    {
+      "ruleId": "NOB-001",
+      "file": "src/pay.test.ts",
+      "messageContains": "no reason"
+    }
+  ]
+}

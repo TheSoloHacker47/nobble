@@ -1,0 +1,10 @@
+{
+  "note": "continue-on-error added to the test step",
+  "findings": [
+    {
+      "ruleId": "NOB-402",
+      "file": ".github/workflows/ci.yml",
+      "messageContains": "continue-on-error"
+    }
+  ]
+}

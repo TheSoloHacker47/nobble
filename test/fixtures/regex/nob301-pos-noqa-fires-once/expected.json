@@ -1,0 +1,10 @@
+{
+  "note": "Three # noqa on one file yields exactly one finding, not three",
+  "findings": [
+    {
+      "ruleId": "NOB-301",
+      "file": "src/pay.py",
+      "messageContains": "noqa"
+    }
+  ]
+}

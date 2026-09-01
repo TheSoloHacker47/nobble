@@ -1,0 +1,5 @@
+jobs:
+  test:
+    steps:
+      - run: rm -rf tmp || true
+      - run: npm test

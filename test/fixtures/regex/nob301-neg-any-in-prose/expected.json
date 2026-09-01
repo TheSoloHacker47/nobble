@@ -1,0 +1,4 @@
+{
+  "note": "The words \"as any\" inside a comment are not a cast",
+  "findings": []
+}

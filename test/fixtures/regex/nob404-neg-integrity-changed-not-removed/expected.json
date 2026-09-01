@@ -1,0 +1,4 @@
+{
+  "note": "A normal lockfile bump swaps integrity hashes rather than dropping them",
+  "findings": []
+}

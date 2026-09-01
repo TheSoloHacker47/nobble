@@ -1,0 +1,9 @@
+{
+  "note": "sleep added to an RSpec example",
+  "findings": [
+    {
+      "ruleId": "NOB-303",
+      "file": "spec/pay_spec.rb"
+    }
+  ]
+}

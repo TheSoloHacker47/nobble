@@ -1,0 +1,9 @@
+{
+  "note": "except Exception: pass added",
+  "findings": [
+    {
+      "ruleId": "NOB-302",
+      "file": "src/pay.py"
+    }
+  ]
+}

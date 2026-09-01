@@ -1,0 +1,4 @@
+{
+  "note": "A setTimeout in ordinary source code with no retry context is normal application code",
+  "findings": []
+}

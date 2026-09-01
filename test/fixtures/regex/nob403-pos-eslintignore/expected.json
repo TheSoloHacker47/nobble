@@ -1,0 +1,9 @@
+{
+  "note": "Test glob added to .eslintignore",
+  "findings": [
+    {
+      "ruleId": "NOB-403",
+      "file": ".eslintignore"
+    }
+  ]
+}
