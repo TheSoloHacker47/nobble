@@ -34,8 +34,25 @@ describe('bundled dist', () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'nobble-iso-'));
     try {
       fs.cpSync(path.join(root, 'dist'), path.join(tmp, 'dist'), { recursive: true });
-      const out = execFileSync('node', ['dist/cli.js'], { cwd: tmp, encoding: 'utf8' });
-      expect(out).toContain('5 grammars loaded');
+      // Not a git repo and no node_modules: exactly the shape of an Actions runner
+      // executing dist/index.js. A diff on stdin is the only input.
+      const diff =
+        [
+          'diff --git a/src/a.test.ts b/src/a.test.ts',
+          'index 111..222 100644',
+          '--- a/src/a.test.ts',
+          '+++ b/src/a.test.ts',
+          '@@ -1,2 +1,2 @@',
+          " it('x', () => {",
+          '-  expect(a).toBe(1);',
+          '+  expect(a).toBeTruthy();',
+        ].join('\n') + '\n';
+      const out = execFileSync('node', ['dist/cli.js', '--diff', '-'], {
+        cwd: tmp,
+        input: diff,
+        encoding: 'utf8',
+      });
+      expect(out).toMatch(/verdict: (pass|warn|block)/);
     } finally {
       fs.rmSync(tmp, { recursive: true, force: true });
     }
