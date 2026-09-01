@@ -268,6 +268,48 @@ so the judgement is visible rather than implicit.
 Everything else Ruby and Python needed -- Minitest's `def test_*` blocks, RSpec message
 stubs, `@patch` decorators, negation normalization -- landed in the adapters, as intended.
 
+### A15. The PR comment never fails the build
+
+Posting the sticky comment needs `pull-requests: write`, which a workflow may not grant. A
+run that analyzed the diff correctly and produced the right verdict should not go red
+because it could not also leave a comment.
+
+**Decision:** comment failures are `core.warning`, with the likely cause named in the
+message. Only the verdict, under an explicit `fail-on`, can fail the build.
+
+The same reasoning applies to SARIF: the file is always written, and uploading it is a
+separate step the workflow opts into with `security-events: write`.
+
+### A16. Verified end to end on a real pull request
+
+`TheSoloHacker47/nobble#1` weakens a payment suite on purpose -- assertions removed, a test
+case deleted, a test skipped, `current_user` mocked, and an unconditional `return true`
+added at the top of an auth middleware. It exists to prove the action works and to be the
+README screenshot.
+
+The action ran on a GitHub-hosted runner and reported 5 findings, score 100, verdict
+`block`; posted the sticky comment with working permalinks; emitted all five as workflow
+annotations; uploaded SARIF; and failed the job with the correct message under
+`fail-on: block`.
+
+The run log also confirmed decision D1 from the other direction: GitHub warned that
+`github/codeql-action/upload-sarif@v3` "targets Node.js 20 but is being forced to run on
+Node.js 24". Nobble targets `node24` directly and needed no forcing. That step has since
+been bumped to `@v4`, which the same log flagged as deprecating in December 2026.
+
+### A17. Measured performance
+
+The definition of done asks for a cold run under 5 seconds on a 500-file diff.
+`test/e2e/performance.test.ts` builds a repo with 500 changed source files and their tests
+across all three languages plus config and CI, then times one full run including grammar
+loading:
+
+**1002 changed files, 502 findings, 700ms.**
+
+Roughly double the required file count at about a seventh of the budget. The batched
+`git cat-file --batch` blob reader is what buys it; one `git show` per file would spend the
+whole budget on process spawns.
+
 ---
 
 ## Runtime dependency justifications

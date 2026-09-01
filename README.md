@@ -11,7 +11,9 @@ tests pass.
 To nobble is to tamper with a racehorse before a race so it cannot win. That is precisely
 what happens to a test suite when someone edits it to stop it failing.
 
-<!-- SCREENSHOT -->
+[![Nobble flagging five weakened tests on a pull request](docs/pr-comment.png)](https://github.com/TheSoloHacker47/nobble/pull/1)
+
+<sub>A real comment from [pull request #1](https://github.com/TheSoloHacker47/nobble/pull/1), which weakens the payment suite on purpose. The critical finding is a mock introduced around `current_user`.</sub>
 
 ---
 
@@ -185,7 +187,7 @@ steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }
   - uses: TheSoloHacker47/nobble@v1
-  - uses: github/codeql-action/upload-sarif@v3
+  - uses: github/codeql-action/upload-sarif@v4
     if: always()
     with:
       sarif_file: nobble.sarif
