@@ -1,0 +1,4 @@
+{
+  "note": "Coded `# noqa: F821` and a rule-named eslint-disable are narrow, reviewable decisions",
+  "findings": []
+}

@@ -1,0 +1,10 @@
+{
+  "note": "One assertion removed from a two-assertion test",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "src/pay.test.ts",
+      "messageContains": "1 assertion removed"
+    }
+  ]
+}

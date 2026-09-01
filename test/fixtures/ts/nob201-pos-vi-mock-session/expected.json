@@ -1,0 +1,10 @@
+{
+  "note": "vi.mock introduced around the session module",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "src/pay.test.ts",
+      "messageContains": "session"
+    }
+  ]
+}

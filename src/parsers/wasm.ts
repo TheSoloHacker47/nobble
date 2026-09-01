@@ -28,12 +28,18 @@ function candidateDirs(): string[] {
   // Source layout: src/parsers/wasm.ts -> <root>/node_modules/...
   out.push(path.resolve(here, '..', '..', 'node_modules', '@vscode', 'tree-sitter-wasm', 'wasm'));
 
-  // Normal resolution, for when Nobble is a dependency of something else.
-  try {
-    const require = createRequire(import.meta.url);
-    out.push(path.dirname(require.resolve('@vscode/tree-sitter-wasm/wasm/tree-sitter-ruby.wasm')));
-  } catch {
-    // not resolvable from here; the candidates above still stand
+  // Normal resolution, for when Nobble is a dependency of something else. Two bases:
+  // this module's own URL, and the working directory -- a bundle executed from a temp
+  // directory can only resolve via the latter.
+  for (const base of [import.meta.url, `file://${path.join(process.cwd(), 'index.js')}`]) {
+    try {
+      const require = createRequire(base);
+      out.push(
+        path.dirname(require.resolve('@vscode/tree-sitter-wasm/wasm/tree-sitter-ruby.wasm')),
+      );
+    } catch {
+      // not resolvable from this base; the other candidates still stand
+    }
   }
   return out;
 }
@@ -65,12 +71,15 @@ export function runtimeWasmPath(): string | undefined {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const bundled = path.join(here, 'wasm', 'tree-sitter-runtime.wasm');
   if (fs.existsSync(bundled)) return bundled;
-  try {
-    const require = createRequire(import.meta.url);
-    return require.resolve('web-tree-sitter/tree-sitter.wasm');
-  } catch {
-    return undefined; // let web-tree-sitter fall back to its own default resolution
+
+  for (const base of [import.meta.url, `file://${path.join(process.cwd(), 'index.js')}`]) {
+    try {
+      return createRequire(base).resolve('web-tree-sitter/tree-sitter.wasm');
+    } catch {
+      // try the next base
+    }
   }
+  return undefined; // let web-tree-sitter fall back to its own default resolution
 }
 
 export const GRAMMAR_NAMES = GRAMMARS;

@@ -1,0 +1,9 @@
+{
+  "note": "toEqual inverted",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "src/pay.test.ts"
+    }
+  ]
+}

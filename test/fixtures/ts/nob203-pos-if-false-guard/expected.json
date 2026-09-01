@@ -1,0 +1,10 @@
+{
+  "note": "A check disabled by wrapping it in if (false)",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "src/middleware/auth.ts",
+      "messageContains": "if (false)"
+    }
+  ]
+}

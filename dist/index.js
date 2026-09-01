@@ -3961,12 +3961,13 @@ function runtimeWasmPath() {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const bundled = path.join(here, "wasm", "tree-sitter-runtime.wasm");
   if (fs2.existsSync(bundled)) return bundled;
-  try {
-    const require2 = createRequire(import.meta.url);
-    return require2.resolve("web-tree-sitter/tree-sitter.wasm");
-  } catch {
-    return void 0;
+  for (const base of [import.meta.url, `file://${path.join(process.cwd(), "index.js")}`]) {
+    try {
+      return createRequire(base).resolve("web-tree-sitter/tree-sitter.wasm");
+    } catch {
+    }
   }
+  return void 0;
 }
 
 // src/parsers/index.ts
@@ -4030,6 +4031,9 @@ function isCommentOnly(line) {
   const t = line.trim();
   return t === "" || t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*") || t.startsWith('"""') || t.startsWith("'''");
 }
+function allTrivial(lines) {
+  return lines.every((l) => isCommentOnly(l.text));
+}
 function extractNumbers(source, keys) {
   const out2 = /* @__PURE__ */ new Map();
   for (const rawLine of source.split("\n")) {
@@ -4042,6 +4046,211 @@ function extractNumbers(source, keys) {
     out2.set(key, [...out2.get(key) ?? [], ...nums]);
   }
   return out2;
+}
+
+// src/rules/block-matching.ts
+function editDistance(a, b, cap = 8) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i2) => i2);
+  for (let i2 = 1; i2 <= a.length; i2++) {
+    const curr = [i2];
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + (a[i2 - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = curr;
+    if (Math.min(...curr) > cap) return cap + 1;
+  }
+  return prev[b.length];
+}
+function isRename(a, b) {
+  if (a === b) return true;
+  const longer = Math.max(a.length, b.length);
+  if (longer === 0) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const threshold = Math.max(2, Math.floor(longer * 0.34));
+  return editDistance(a, b, threshold + 1) <= threshold;
+}
+function ownAssertions(block, blocks, adapter) {
+  const all = adapter.findAssertions(block.node);
+  const nested = blocks.filter(
+    (b) => b !== block && b.node.startIndex >= block.node.startIndex && b.node.endIndex <= block.node.endIndex
+  );
+  if (nested.length === 0) return all;
+  return all.filter(
+    (a) => !nested.some(
+      (n) => a.node.startIndex >= n.node.startIndex && a.node.endIndex <= n.node.endIndex
+    )
+  );
+}
+function diffTestBlocks(ctx) {
+  const beforeAdapter = ctx.before?.adapter;
+  const afterAdapter = ctx.after?.adapter;
+  const beforeTree = ctx.before?.tree;
+  const afterTree = ctx.after?.tree;
+  if (!beforeAdapter || !afterAdapter || !beforeTree || !afterTree) return void 0;
+  const beforeBlocks = beforeAdapter.findTestBlocks(beforeTree);
+  const afterBlocks = afterAdapter.findTestBlocks(afterTree);
+  const matched = [];
+  const removed = [];
+  const usedAfter = /* @__PURE__ */ new Set();
+  for (const before of beforeBlocks) {
+    let after = afterBlocks.find(
+      (b) => !usedAfter.has(b) && b.kind === before.kind && b.normalizedName === before.normalizedName
+    );
+    if (!after) {
+      after = afterBlocks.find(
+        (b) => !usedAfter.has(b) && b.kind === before.kind && isRename(before.normalizedName, b.normalizedName)
+      );
+    }
+    if (!after) {
+      removed.push(before);
+      continue;
+    }
+    usedAfter.add(after);
+    matched.push({
+      before,
+      after,
+      beforeAssertions: ownAssertions(before, beforeBlocks, beforeAdapter),
+      afterAssertions: ownAssertions(after, afterBlocks, afterAdapter)
+    });
+  }
+  return {
+    matched,
+    removed,
+    added: afterBlocks.filter((b) => !usedAfter.has(b)),
+    beforeAdapter,
+    afterAdapter,
+    totalBefore: beforeAdapter.findAssertions(beforeTree.rootNode).length,
+    totalAfter: afterAdapter.findAssertions(afterTree.rootNode).length
+  };
+}
+function fileLostAssertions(diff) {
+  return diff.totalAfter < diff.totalBefore;
+}
+function pairedSourceDeleted(ctx) {
+  return ctx.allFiles.some(
+    (f) => f.status === "deleted" && f.kind === "source" && sharesBasename(f.path, ctx.file.path)
+  );
+}
+function sharesBasename(sourcePath, testPath) {
+  const base = (p) => (p.split("/").pop() ?? "").replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|rb|go)$/, "").replace(/^test_/, "").replace(/[._-](test|spec)$/, "").toLowerCase();
+  const b = base(sourcePath);
+  return b.length > 2 && b === base(testPath);
+}
+
+// src/rules/nob101-assertions-removed.ts
+var nob101 = {
+  id: "NOB-101",
+  title: "Assertions removed from an existing test",
+  defaultSeverity: "high",
+  weight: 30,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The test still exists and still passes, so nothing looks wrong, but it now checks less than it did.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    if (!fileLostAssertions(diff)) return [];
+    const findings = [];
+    for (const m of diff.matched) {
+      const lost = m.beforeAssertions.length - m.afterAssertions.length;
+      if (lost <= 0) continue;
+      const removedTexts = m.beforeAssertions.filter((b) => !m.afterAssertions.some((a) => a.text === b.text)).slice(0, 3).map((a) => a.text);
+      findings.push(
+        makeFinding(ctx, {
+          line: m.after.startLine,
+          endLine: m.after.endLine,
+          message: `${lost} assertion${lost === 1 ? "" : "s"} removed from \`${m.after.name}\` (${m.beforeAssertions.length} \u2192 ${m.afterAssertions.length}).`,
+          before: removedTexts.join("\n") || void 0
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob102-assertion-weakened.ts
+var nob102 = {
+  id: "NOB-102",
+  title: "Assertion weakened",
+  defaultSeverity: "high",
+  weight: 30,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The assertion count is unchanged, so the test looks untouched, but it now accepts values it used to reject.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    const findings = [];
+    for (const m of diff.matched) {
+      if (m.beforeAssertions.length !== m.afterAssertions.length) continue;
+      for (let i2 = 0; i2 < m.beforeAssertions.length; i2++) {
+        const before = m.beforeAssertions[i2];
+        const after = m.afterAssertions[i2];
+        if (before.text === after.text) continue;
+        const beforeStrength = diff.beforeAdapter.assertionStrength(before);
+        const afterStrength = diff.afterAdapter.assertionStrength(after);
+        if (afterStrength >= beforeStrength) continue;
+        const how = before.matcher === after.matcher ? `\`${after.matcher}\` now accepts a wildcard argument` : `\`${before.matcher}\` \u2192 \`${after.matcher}\``;
+        findings.push(
+          makeFinding(ctx, {
+            line: after.startLine,
+            message: `Assertion weakened in \`${m.after.name}\`: ${how}.`,
+            before: before.text,
+            after: after.text
+          })
+        );
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob103-test-deleted.ts
+var nob103 = {
+  id: "NOB-103",
+  title: "Whole test block deleted",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The test is gone rather than fixed. Nothing fails, and the file list shows no deletion, so the loss is invisible in review.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    if (!fileLostAssertions(diff)) return [];
+    const findings = [];
+    for (const block of diff.removed) {
+      if (block.kind === "suite" && diff.removed.some((b) => b.kind === "case")) continue;
+      findings.push(
+        makeFinding(ctx, {
+          // The block is gone from the after-file, so anchor to where it used to start.
+          line: Math.max(1, Math.min(block.startLine, countLines(ctx.after?.source))),
+          message: `Test ${block.kind === "suite" ? "suite" : "case"} \`${block.name}\` was deleted.`,
+          before: block.node.text.split("\n").slice(0, 3).join("\n")
+        })
+      );
+    }
+    return findings;
+  }
+};
+function countLines(source) {
+  if (!source) return 1;
+  return source.split("\n").length;
 }
 
 // src/rules/nob104-test-skipped.ts
@@ -4099,6 +4308,205 @@ var nob104 = {
   }
 };
 
+// src/rules/nob105-expectation-inverted.ts
+var nob105 = {
+  id: "NOB-105",
+  title: "Expected-failure inversion",
+  defaultSeverity: "medium",
+  weight: 15,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The expectation was flipped rather than satisfied. The test passes by asserting the behaviour it used to reject.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    const findings = [];
+    for (const m of diff.matched) {
+      if (m.beforeAssertions.length !== m.afterAssertions.length) continue;
+      for (let i2 = 0; i2 < m.beforeAssertions.length; i2++) {
+        const before = m.beforeAssertions[i2];
+        const after = m.afterAssertions[i2];
+        if (before.isNegated || !after.isNegated) continue;
+        if (before.matcher !== after.matcher) continue;
+        findings.push(
+          makeFinding(ctx, {
+            line: after.startLine,
+            message: `Expectation inverted in \`${m.after.name}\`: \`${before.matcher}\` is now negated.`,
+            before: before.text,
+            after: after.text
+          })
+        );
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob201-sensitive-mock.ts
+function symbolMatcher(patterns) {
+  const compiled = patterns.map((p) => {
+    try {
+      return { source: p, re: new RegExp(p, "i") };
+    } catch {
+      return { source: p, re: new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") };
+    }
+  });
+  return (target) => compiled.find((c) => c.re.test(target))?.source;
+}
+var nob201 = {
+  id: "NOB-201",
+  title: "Mock introduced around a sensitive symbol",
+  defaultSeverity: "critical",
+  weight: 40,
+  requiresAst: true,
+  appliesTo: ["test", "source"],
+  rationale: "Mocking an authorization or identity boundary removes the very thing the test was there to verify, while looking like ordinary setup.",
+  run(ctx) {
+    const afterTree = ctx.after?.tree;
+    const adapter = ctx.after?.adapter;
+    if (!afterTree || !adapter) return [];
+    const matches = symbolMatcher(ctx.config.sensitiveSymbols);
+    const afterMocks = adapter.findMocks(afterTree);
+    const beforeMocks = ctx.before?.tree && ctx.before.adapter ? ctx.before.adapter.findMocks(ctx.before.tree) : [];
+    const beforeKeys = new Set(beforeMocks.map((m) => `${m.construct}::${m.target}`));
+    const findings = [];
+    for (const mock of afterMocks) {
+      if (beforeKeys.has(`${mock.construct}::${mock.target}`)) continue;
+      const symbol = matches(mock.target);
+      if (!symbol) continue;
+      findings.push(
+        makeFinding(ctx, {
+          line: mock.startLine,
+          message: `Mock added around a sensitive symbol (\`${symbol}\`): \`${mock.construct}\` targeting \`${mock.target}\`.`,
+          after: mock.text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob202-security-untested.ts
+var nob202 = {
+  id: "NOB-202",
+  title: "Security-path source change with no new test coverage",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: true,
+  appliesTo: ["source"],
+  rationale: "Security-relevant behaviour changed while the tests that cover it did not, so nothing verifies the new behaviour.",
+  run(ctx) {
+    if (!ctx.file.isSecurityPath) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (ctx.addedLines.length === 0 || allTrivial(ctx.addedLines)) return [];
+    const paired = ctx.pairedTest;
+    if (!paired) return [];
+    if (paired.changed) {
+      const testFile = paired.file;
+      if (!testFile) return [];
+      const gained = testFile.addedLines.filter(
+        (l) => /\b(expect|assert|should)\b/.test(l.text)
+      ).length;
+      const lost = testFile.removedLines.filter(
+        (l) => /\b(expect|assert|should)\b/.test(l.text)
+      ).length;
+      if (gained >= lost) return [];
+      return [
+        makeFinding(ctx, {
+          line: ctx.addedLines[0].line,
+          message: `Security-path file changed while its test \`${paired.path}\` lost ${lost - gained} assertion(s).`,
+          after: ctx.addedLines[0].text
+        })
+      ];
+    }
+    return [
+      makeFinding(ctx, {
+        line: ctx.addedLines[0].line,
+        message: `Security-path file changed but its paired test \`${paired.path}\` was not touched.`,
+        after: ctx.addedLines[0].text
+      })
+    ];
+  }
+};
+
+// src/rules/nob203-security-bypass.ts
+var UNCONDITIONAL_EXIT = /^\s*(?:return\s+(?:true|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
+var DISABLED_GUARD = [
+  { re: /\bif\s*\(\s*(?:false|0)\s*\)/, label: "if (false)" },
+  { re: /\bif\s+False\s*:/, label: "if False:" },
+  { re: /\bif\s+false\b/, label: "if false" },
+  {
+    re: /\b(?:FEATURE_\w+|flags?\.\w+|isEnabled\w*)\s*=\s*true\b/i,
+    label: "feature flag forced on"
+  }
+];
+function leadingStatements(body2, limit = 2) {
+  if (!body2) return [];
+  const out2 = [];
+  for (let i2 = 0; i2 < body2.namedChildCount && out2.length < limit; i2++) {
+    const child = body2.namedChild(i2);
+    if (!child) continue;
+    if (child.type.includes("comment")) continue;
+    out2.push(child);
+  }
+  return out2;
+}
+var nob203 = {
+  id: "NOB-203",
+  title: "Early return or bypass added in a security path",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: true,
+  appliesTo: ["source"],
+  rationale: "An unconditional exit at the top of a function short-circuits every check below it, so the security logic still exists but never runs.",
+  run(ctx) {
+    if (!ctx.file.isSecurityPath) return [];
+    const tree = ctx.after?.tree;
+    const adapter = ctx.after?.adapter;
+    if (!tree || !adapter) return [];
+    if (ctx.addedLines.length === 0) return [];
+    const addedByLine = new Map(ctx.addedLines.map((l) => [l.line, l.text]));
+    const findings = [];
+    const reported = /* @__PURE__ */ new Set();
+    for (const fn of adapter.findFunctions(tree)) {
+      for (const statement of leadingStatements(fn.bodyNode)) {
+        const line = statement.startPosition.row + 1;
+        const added = addedByLine.get(line);
+        if (added === void 0) continue;
+        if (reported.has(line)) continue;
+        const text = statement.text.trim();
+        if (UNCONDITIONAL_EXIT.test(text)) {
+          reported.add(line);
+          findings.push(
+            makeFinding(ctx, {
+              line,
+              message: `Unconditional early exit added at the top of \`${fn.name}\`: \`${text.replace(/\s+/g, " ")}\`.`,
+              after: added
+            })
+          );
+        }
+      }
+    }
+    for (const line of ctx.addedLines) {
+      if (reported.has(line.line)) continue;
+      const guard = DISABLED_GUARD.find(({ re }) => re.test(line.text));
+      if (!guard) continue;
+      reported.add(line.line);
+      findings.push(
+        makeFinding(ctx, {
+          line: line.line,
+          message: `Security check disabled by construction (${guard.label}): \`${line.text.trim()}\`.`,
+          after: line.text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
 // src/rules/nob301-suppression-added.ts
 var COMMENT_DIRECTIVES = [
   { re: /@ts-ignore\b/, label: "@ts-ignore" },
@@ -4111,6 +4519,21 @@ var COMMENT_DIRECTIVES = [
   { re: /#pragma\s+warning\s+disable\b/, label: "#pragma warning disable" },
   { re: /\bnolint\b/, label: "nolint" }
 ];
+var TARGETED_SUPPRESSION = [
+  /#\s*type:\s*ignore\[[^\]]+\]/,
+  //          # type: ignore[return-value]
+  /#\s*noqa\s*:\s*\w+/,
+  //                     # noqa: F821
+  /eslint-disable(?:-next-line|-line)?\s+[\w@/-]+/,
+  // eslint-disable-next-line no-shadow
+  /rubocop:disable\s+[\w/]+/,
+  //                rubocop:disable Style/Documentation
+  /nolint:\w+/
+  //                              nolint:errcheck
+];
+function isTargeted(text) {
+  return TARGETED_SUPPRESSION.some((re) => re.test(text));
+}
 var CODE_SUPPRESSIONS = [
   { re: /\bas\s+any\b/, label: "as any" },
   { re: /\bas\s+unknown\s+as\b/, label: "as unknown as" }
@@ -4129,10 +4552,11 @@ var nob301 = {
       const text = line.text;
       for (const { re, label } of COMMENT_DIRECTIVES) {
         if (!re.test(text)) continue;
+        if (isTargeted(text)) break;
         return [
           makeFinding(ctx, {
             line: line.line,
-            message: `Suppression added (${label}): \`${text.trim()}\``,
+            message: `Blanket suppression added (${label}): \`${text.trim()}\``,
             after: text
           })
         ];
@@ -4507,9 +4931,25 @@ var done = false;
 function registerAllRules() {
   if (done) return;
   done = true;
-  for (const rule of [nob001, nob104, nob301, nob302, nob303, nob401, nob402, nob403, nob404]) {
-    registerRule(rule);
-  }
+  const rules = [
+    nob001,
+    nob101,
+    nob102,
+    nob103,
+    nob104,
+    nob105,
+    nob201,
+    nob202,
+    nob203,
+    nob301,
+    nob302,
+    nob303,
+    nob401,
+    nob402,
+    nob403,
+    nob404
+  ];
+  for (const rule of rules) registerRule(rule);
 }
 
 // src/action.ts

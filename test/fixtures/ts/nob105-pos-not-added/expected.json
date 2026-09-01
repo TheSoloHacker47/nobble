@@ -1,0 +1,10 @@
+{
+  "note": "toBe inverted with .not",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "src/pay.test.ts",
+      "messageContains": "inverted"
+    }
+  ]
+}

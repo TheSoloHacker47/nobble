@@ -1,0 +1,10 @@
+{
+  "note": "A bare `# type: ignore` silences every present and future error on the line",
+  "findings": [
+    {
+      "ruleId": "NOB-301",
+      "file": "src/pay.py",
+      "messageContains": "Blanket"
+    }
+  ]
+}

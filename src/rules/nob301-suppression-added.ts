@@ -26,6 +26,30 @@ const COMMENT_DIRECTIVES: { re: RegExp; label: string }[] = [
 ];
 
 /**
+ * Suppressions that name the specific thing they silence.
+ *
+ * `# type: ignore[return-value]` suppresses one identified error; `# type: ignore`
+ * silences every present and future error on that line. The same split applies to
+ * `# noqa: F821`, `eslint-disable-next-line no-shadow`, and `rubocop:disable Style/Foo`.
+ * Only the blanket form is the escape hatch this rule is about.
+ *
+ * This distinction was added after the §11.5 smoke test: NOB-301 accounted for 12 of the
+ * 16 findings across 150 real PRs, and every one of those was a narrow, coded suppression
+ * in ordinary typed-Python or lint work. See DECISIONS.md A8 for the measured effect.
+ */
+const TARGETED_SUPPRESSION = [
+  /#\s*type:\s*ignore\[[^\]]+\]/, //          # type: ignore[return-value]
+  /#\s*noqa\s*:\s*\w+/, //                     # noqa: F821
+  /eslint-disable(?:-next-line|-line)?\s+[\w@/-]+/, // eslint-disable-next-line no-shadow
+  /rubocop:disable\s+[\w/]+/, //                rubocop:disable Style/Documentation
+  /nolint:\w+/, //                              nolint:errcheck
+];
+
+function isTargeted(text: string): boolean {
+  return TARGETED_SUPPRESSION.some((re) => re.test(text));
+}
+
+/**
  * Casts, which are code. These must NOT match a comment: prose like
  * "works for as many rows as any caller needs" contains a literal `as any`.
  */
@@ -52,10 +76,13 @@ export const nob301: Rule = {
 
       for (const { re, label } of COMMENT_DIRECTIVES) {
         if (!re.test(text)) continue;
+        // A suppression that names what it silences is a narrow, reviewable decision.
+        // Only the blanket form is the escape hatch.
+        if (isTargeted(text)) break;
         return [
           makeFinding(ctx, {
             line: line.line,
-            message: `Suppression added (${label}): \`${text.trim()}\``,
+            message: `Blanket suppression added (${label}): \`${text.trim()}\``,
             after: text,
           }),
         ];

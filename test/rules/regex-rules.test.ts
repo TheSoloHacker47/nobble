@@ -12,7 +12,7 @@ const fixtures = discoverFixtures('regex');
 
 describe('regex-only rules', () => {
   it('found the fixture set', () => {
-    expect(fixtures.length).toBeGreaterThanOrEqual(54);
+    expect(fixtures.length).toBeGreaterThanOrEqual(57);
   });
 
   it.each(fixtures)('$name', async ({ dir }) => {

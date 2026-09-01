@@ -1,0 +1,10 @@
+{
+  "note": "jest.mock introduced around current_user",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "src/pay.test.ts",
+      "messageContains": "current_user"
+    }
+  ]
+}

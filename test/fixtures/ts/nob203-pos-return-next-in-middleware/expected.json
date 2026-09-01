@@ -1,0 +1,10 @@
+{
+  "note": "return next() added at the top, short-circuiting the auth check below it",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "src/middleware/auth.ts",
+      "messageContains": "requireUser"
+    }
+  ]
+}

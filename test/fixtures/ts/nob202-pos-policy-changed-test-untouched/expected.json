@@ -1,0 +1,10 @@
+{
+  "note": "A policy file changed while its paired test was not touched",
+  "findings": [
+    {
+      "ruleId": "NOB-202",
+      "file": "src/policies/admin.ts",
+      "messageContains": "was not touched"
+    }
+  ]
+}

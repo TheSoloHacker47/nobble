@@ -1,0 +1,9 @@
+{
+  "note": "Auth middleware changed with its test left alone",
+  "findings": [
+    {
+      "ruleId": "NOB-202",
+      "file": "src/middleware/auth.ts"
+    }
+  ]
+}

@@ -45,4 +45,6 @@ export interface AnalysisResult {
   degraded: boolean;
   degradedReason?: string;
   filesAnalyzed: number;
+  /** How many of those were test files. Used by the smoke test's honest denominator. */
+  testFilesChanged: number;
 }

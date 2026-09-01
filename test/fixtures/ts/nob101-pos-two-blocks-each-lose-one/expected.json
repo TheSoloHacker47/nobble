@@ -1,0 +1,15 @@
+{
+  "note": "Assertions removed from two different tests gives two findings",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "src/pay.test.ts",
+      "messageContains": "charges"
+    },
+    {
+      "ruleId": "NOB-101",
+      "file": "src/pay.test.ts",
+      "messageContains": "refunds"
+    }
+  ]
+}

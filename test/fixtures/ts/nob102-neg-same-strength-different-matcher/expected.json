@@ -1,0 +1,4 @@
+{
+  "note": "toBe to toEqual is a lateral move, not a weakening",
+  "findings": []
+}

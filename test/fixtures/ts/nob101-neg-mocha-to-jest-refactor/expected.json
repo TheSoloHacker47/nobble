@@ -1,0 +1,4 @@
+{
+  "note": "MANDATORY NEGATIVE: a suite ported from Mocha/Chai to Jest with every assertion intact",
+  "findings": []
+}

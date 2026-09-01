@@ -140,6 +140,63 @@ blobs and compare them numerically, keyed by the surrounding path. Format-agnost
 and no new dependencies. The cost is that an exotic layout may be missed; that trade favours few
 false positives, which is the project's stated priority (§11).
 
+### A8. NOB-301 fires on blanket suppressions only, not coded ones
+
+The §11.5 smoke test is the spec's own tightening gate, and the first run failed it on the
+metric that matters.
+
+**First measurement** (150 merged PRs across `vitejs/vite`, `pallets/flask`,
+`sinatra/sinatra`):
+
+| Metric                           | Rate                       |
+| -------------------------------- | -------------------------- |
+| All PRs                          | 6.0% (passes the 10% gate) |
+| **PRs that touched a test file** | **19.0%**                  |
+
+The headline 6.0% is flattered by PRs that never touch a test file -- most rules cannot fire
+on those, so they are free passes. Among the 42 PRs that did touch tests, the rate was 19%.
+NOB-301 produced 12 of the 16 total findings, and every one was a _coded_ suppression
+(`# type: ignore[return-value]`, `# noqa: F821`, `eslint-disable-next-line import-x/no-duplicates`)
+in ordinary typed-Python or lint work.
+
+**Decision:** NOB-301 fires only on **blanket** suppressions. A suppression that names what
+it silences is a narrow decision someone already made deliberately; a bare `# type: ignore`
+or `@ts-ignore` silences every present and future error on that line, and that is the escape
+hatch this rule exists to surface.
+
+This stays inside the spec: §6 lists `# type: ignore` and `# noqa` as triggers and says
+nothing about the bracketed variants, which are what is now excluded.
+
+**Second measurement**, same 150 PRs, no other change:
+
+| Metric                       | Before | After    |
+| ---------------------------- | ------ | -------- |
+| All PRs                      | 6.0%   | **2.7%** |
+| PRs that touched a test file | 19.0%  | **7.1%** |
+| Total findings               | 16     | 6        |
+
+Four PRs remain flagged. Two are unambiguous true positives -- `sinatra/sinatra#2115`, whose
+title is literally "Skip broken tests.", and `#2124`, the revert that reinstates them. The
+other two are genuine blanket suppressions at weight 10, which can only ever produce `warn`.
+
+### A9. The smoke test reports two rates, and the second one is the real one
+
+A rate over all PRs understates the false-positive problem, because a PR touching no test
+file is a free pass for almost every rule. `scripts/smoke.ts` therefore also reports the
+rate among PRs that touched at least one test file, and that is the number quoted in the
+README. It is the harder number and the honest one.
+
+### A10. The smoke test diffs from the merge-base, not the base branch tip
+
+The first smoke implementation used `git diff base..head`, which for a true merge commit
+includes every unrelated commit that landed on the base branch while the PR was open. It
+produced findings like a Flask documentation PR being blamed for six `# type: ignore` lines
+elsewhere in the tree.
+
+**Decision:** diff `base...head` (three dots, from the merge-base). For a squash merge the
+merge-base is the parent, so one expression handles both merge styles. Worth recording
+because the bug did not look like a bug -- it looked like a false-positive rate.
+
 ---
 
 ## Runtime dependency justifications

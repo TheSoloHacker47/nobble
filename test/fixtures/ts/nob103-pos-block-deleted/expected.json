@@ -1,0 +1,10 @@
+{
+  "note": "A whole test case removed with nothing resembling it added back",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "src/pay.test.ts",
+      "messageContains": "rejects an expired card"
+    }
+  ]
+}

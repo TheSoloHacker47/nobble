@@ -1,0 +1,4 @@
+{
+  "note": "A coded `# type: ignore[return-value]` silences one identified error, not everything",
+  "findings": []
+}

@@ -60,6 +60,30 @@ export function grammarForExtension(ext: string): GrammarName | undefined {
 
 const adapters = new Map<string, LanguageAdapter>();
 
+/**
+ * Builds and registers every adapter. Must be awaited before any AST rule runs; the engine
+ * does this once per run when at least one AST rule is enabled.
+ */
+export async function initAdapters(): Promise<void> {
+  if (adapters.size > 0) return;
+  const { createTypeScriptAdapter } = await import('./typescript.js');
+
+  const build = async (grammar: GrammarName, id: string, extensions: string[]) => {
+    const parser = await getParser(grammar);
+    return createTypeScriptAdapter(id, extensions, (source: string) => {
+      const tree = parser.parse(source);
+      if (!tree) throw new Error(`failed to parse ${id} source`);
+      return tree;
+    });
+  };
+
+  registerAdapter(await build('typescript', 'typescript', ['.ts', '.mts', '.cts']));
+  // TSX and JSX share a grammar; plain JS parses correctly under it too, and using one
+  // grammar for all three avoids a JSX file failing because it was sent to the TS parser.
+  registerAdapter(await build('tsx', 'tsx', ['.tsx', '.jsx']));
+  registerAdapter(await build('javascript', 'javascript', ['.js', '.mjs', '.cjs']));
+}
+
 export function registerAdapter(adapter: LanguageAdapter): void {
   for (const ext of adapter.extensions) adapters.set(ext.toLowerCase(), adapter);
 }

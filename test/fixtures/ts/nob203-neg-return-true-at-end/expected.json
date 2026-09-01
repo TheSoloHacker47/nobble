@@ -1,0 +1,4 @@
+{
+  "note": "return true as the LAST statement is how you write a predicate, not a bypass",
+  "findings": []
+}

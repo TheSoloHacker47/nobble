@@ -1,0 +1,15 @@
+{
+  "note": "Two cases removed gives two findings",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "src/pay.test.ts",
+      "messageContains": "b two"
+    },
+    {
+      "ruleId": "NOB-103",
+      "file": "src/pay.test.ts",
+      "messageContains": "c three"
+    }
+  ]
+}

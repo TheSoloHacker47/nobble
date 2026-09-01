@@ -6,3 +6,4 @@ nobble.sarif
 /tmp/
 *.tmp.mjs
 .smoke-cache/
+smoke-results.json

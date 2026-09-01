@@ -1,0 +1,10 @@
+{
+  "note": "Three of four assertions deleted while the test keeps its name",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "src/pay.test.ts",
+      "messageContains": "3 assertions removed"
+    }
+  ]
+}

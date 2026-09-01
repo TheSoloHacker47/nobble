@@ -103,6 +103,36 @@ const nob301 = [
     findings: [{ ruleId: 'NOB-301', file: 'src/pay.py', messageContains: 'noqa' }],
   },
   {
+    name: 'nob301-neg-targeted-type-ignore',
+    note: 'A coded `# type: ignore[return-value]` silences one identified error, not everything',
+    before: { 'src/pay.py': 'def name(self) -> str:\n    return self._name\n' },
+    after: {
+      'src/pay.py': 'def name(self) -> str:\n    return self._name  # type: ignore[return-value]\n',
+    },
+    findings: [],
+  },
+  {
+    name: 'nob301-neg-targeted-noqa-and-eslint',
+    note: 'Coded `# noqa: F821` and a rule-named eslint-disable are narrow, reviewable decisions',
+    before: {
+      'src/pay.py': 'raise SomeError(message)\n',
+      'src/pay.ts': 'import { a } from "./a";\n',
+    },
+    after: {
+      'src/pay.py': 'raise BaseExceptionGroup(message, errors)  # noqa: F821\n',
+      'src/pay.ts':
+        '// eslint-disable-next-line import-x/no-duplicates\nimport { a } from "./a";\n',
+    },
+    findings: [],
+  },
+  {
+    name: 'nob301-pos-blanket-type-ignore',
+    note: 'A bare `# type: ignore` silences every present and future error on the line',
+    before: { 'src/pay.py': 'def name(self) -> str:\n    return self._name\n' },
+    after: { 'src/pay.py': 'def name(self) -> str:  # type: ignore\n    return self._name\n' },
+    findings: [{ ruleId: 'NOB-301', file: 'src/pay.py', messageContains: 'Blanket' }],
+  },
+  {
     name: 'nob301-neg-suppression-removed',
     note: 'Removing a suppression is the good direction',
     before: { 'src/pay.ts': '// @ts-ignore\nexport const a = f();\n' },

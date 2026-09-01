@@ -1,0 +1,18 @@
+{
+  "note": "Security code changed AND its test lost assertions in the same diff",
+  "findings": [
+    {
+      "ruleId": "NOB-202",
+      "file": "src/policies/admin.ts",
+      "messageContains": "lost"
+    },
+    {
+      "ruleId": "NOB-101",
+      "file": "src/policies/admin.test.ts"
+    },
+    {
+      "ruleId": "NOB-203",
+      "file": "src/policies/admin.ts"
+    }
+  ]
+}

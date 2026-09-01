@@ -17,12 +17,24 @@ var __require = /* @__PURE__ */ ((x) => typeof require !== "undefined" ? require
   if (typeof require !== "undefined") return require.apply(this, arguments);
   throw Error('Dynamic require of "' + x + '" is not supported');
 });
+var __esm = (fn, res, err2) => function __init() {
+  if (err2) throw err2[0];
+  try {
+    return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
+  } catch (e) {
+    throw err2 = [e], e;
+  }
+};
 var __commonJS = (cb, mod) => function __require2() {
   try {
     return mod || (0, cb[__getOwnPropNames(cb)[0]])((mod = { exports: {} }).exports, mod), mod.exports;
   } catch (e) {
     throw mod = 0, e;
   }
+};
+var __export = (target, all) => {
+  for (var name2 in all)
+    __defProp(target, name2, { get: all[name2], enumerable: true });
 };
 var __copyProps = (to, from, except, desc) => {
   if (from && typeof from === "object" || typeof from === "function") {
@@ -9234,6 +9246,347 @@ var require_parse_diff = __commonJS({
   }
 });
 
+// src/parsers/types.ts
+function normalizeName(name2) {
+  return name2.toLowerCase().replace(/[^a-z0-9]+/g, "").trim();
+}
+var init_types = __esm({
+  "src/parsers/types.ts"() {
+    "use strict";
+  }
+});
+
+// src/parsers/walk.ts
+function walk(node, visit) {
+  const stack = [node];
+  while (stack.length) {
+    const current = stack.pop();
+    if (visit(current) === false) continue;
+    for (let i2 = current.namedChildCount - 1; i2 >= 0; i2--) {
+      const child = current.namedChild(i2);
+      if (child) stack.push(child);
+    }
+  }
+}
+function lineOf(node) {
+  return node.startPosition.row + 1;
+}
+function endLineOf(node) {
+  return node.endPosition.row + 1;
+}
+function textOf(node, maxLength = 200) {
+  const text = node.text.replace(/\s+/g, " ").trim();
+  return text.length > maxLength ? text.slice(0, maxLength - 1) + "\u2026" : text;
+}
+function unquote(text) {
+  return text.replace(/^['"`]|['"`]$/g, "");
+}
+function firstStringArg(argsNode) {
+  if (!argsNode) return void 0;
+  for (let i2 = 0; i2 < argsNode.namedChildCount; i2++) {
+    const child = argsNode.namedChild(i2);
+    if (!child) continue;
+    if (child.type === "string" || child.type === "template_string" || child.type === "string_literal") {
+      return unquote(child.text);
+    }
+  }
+  return void 0;
+}
+function argTexts(argsNode) {
+  if (!argsNode) return [];
+  const out2 = [];
+  for (let i2 = 0; i2 < argsNode.namedChildCount; i2++) {
+    const child = argsNode.namedChild(i2);
+    if (child) out2.push(textOf(child, 80));
+  }
+  return out2;
+}
+var init_walk = __esm({
+  "src/parsers/walk.ts"() {
+    "use strict";
+  }
+});
+
+// src/parsers/typescript.ts
+var typescript_exports = {};
+__export(typescript_exports, {
+  TS_STRENGTH: () => STRENGTH,
+  createTypeScriptAdapter: () => createTypeScriptAdapter
+});
+function memberChain(node) {
+  const parts2 = [];
+  let current = node;
+  while (current) {
+    if (current.type === "member_expression") {
+      const prop = current.childForFieldName("property");
+      if (!prop) return void 0;
+      parts2.unshift(prop.text);
+      current = current.childForFieldName("object");
+    } else if (current.type === "identifier") {
+      parts2.unshift(current.text);
+      return parts2;
+    } else if (current.type === "call_expression") {
+      const fn = current.childForFieldName("function");
+      if (fn?.type === "identifier") {
+        parts2.unshift(`${fn.text}()`);
+        return parts2;
+      }
+      return parts2.length ? parts2 : void 0;
+    } else {
+      return parts2.length ? parts2 : void 0;
+    }
+  }
+  return void 0;
+}
+function calleeName(call) {
+  const fn = call.childForFieldName("function");
+  if (!fn) return void 0;
+  if (fn.type === "identifier") return fn.text;
+  if (fn.type === "member_expression") {
+    const chain = memberChain(fn);
+    return chain?.join(".");
+  }
+  return void 0;
+}
+function baseCallee(name2) {
+  return name2?.split(".")[0]?.replace(/\(\)$/, "");
+}
+function createTypeScriptAdapter(id, extensions, parse) {
+  const adapter = {
+    id,
+    extensions,
+    parse,
+    findTestBlocks(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "call_expression") return;
+        let name2 = calleeName(node);
+        const args2 = node.childForFieldName("arguments");
+        if (!name2) {
+          const fn = node.childForFieldName("function");
+          if (fn?.type === "call_expression") name2 = calleeName(fn);
+        }
+        const base = baseCallee(name2);
+        if (!base) return;
+        const isSuite = SUITE_NAMES.has(base);
+        const isCase = CASE_NAMES.has(base);
+        if (!isSuite && !isCase) return;
+        const title = firstStringArg(args2);
+        if (title === void 0) return;
+        out2.push({
+          name: title,
+          normalizedName: normalizeName(title),
+          kind: isSuite ? "suite" : "case",
+          node,
+          startLine: lineOf(node),
+          endLine: endLineOf(node)
+        });
+      });
+      return out2;
+    },
+    findAssertions(node) {
+      const out2 = [];
+      walk(node, (n) => {
+        if (n.type !== "call_expression") return;
+        const fn = n.childForFieldName("function");
+        if (!fn) return;
+        if (fn.type === "member_expression") {
+          const chain = memberChain(fn);
+          if (!chain || chain.length < 2) return;
+          const root = chain[0];
+          const links = chain.slice(1);
+          const isExpect = root === "expect()";
+          const isAssert = root === "assert" || root === "chai" || root === "should";
+          const isShould = links.includes("should");
+          if (!isExpect && !isAssert && !isShould) return;
+          const matcher = [...links].reverse().find((l) => !CHAIN_MODIFIERS.has(l)) ?? links[links.length - 1];
+          const args2 = n.childForFieldName("arguments");
+          out2.push({
+            node: n,
+            startLine: lineOf(n),
+            matcher,
+            text: textOf(n),
+            isNegated: links.some((l) => NEGATION_LINKS.has(l)) || /^(refute|notStrictEqual|notEqual|notDeepEqual)$/.test(matcher),
+            args: argTexts(args2)
+          });
+          return;
+        }
+        if (fn.type === "identifier" && fn.text === "assert") {
+          out2.push({
+            node: n,
+            startLine: lineOf(n),
+            matcher: "assert",
+            text: textOf(n),
+            isNegated: false,
+            args: argTexts(n.childForFieldName("arguments"))
+          });
+        }
+      });
+      return out2;
+    },
+    findMocks(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "call_expression") return;
+        const fn = node.childForFieldName("function");
+        if (fn?.type !== "member_expression") return;
+        const chain = memberChain(fn);
+        if (!chain || chain.length < 2) return;
+        const object = chain[0];
+        const method = chain[chain.length - 1];
+        const construct = MOCK_CONSTRUCTS.find((c) => c.object === object && c.method === method);
+        if (!construct) return;
+        const args2 = node.childForFieldName("arguments");
+        const texts = argTexts(args2);
+        const firstArg = args2?.namedChild(0);
+        const receiverStyle = texts.length >= 2 && firstArg !== null && firstArg?.type !== "string" && firstArg?.type !== "template_string";
+        const target = receiverStyle ? texts.slice(0, 2).map((t) => t.replace(/^['"`]|['"`]$/g, "")).join(".") : firstStringArg(args2) ?? texts[0] ?? "";
+        out2.push({
+          node,
+          startLine: lineOf(node),
+          target,
+          construct: `${object}.${method}`,
+          text: textOf(node)
+        });
+      });
+      return out2;
+    },
+    findFunctions(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (!FUNCTION_TYPES.includes(node.type)) return;
+        const nameNode = node.childForFieldName("name");
+        out2.push({
+          name: nameNode?.text ?? "<anonymous>",
+          node,
+          bodyNode: node.childForFieldName("body"),
+          startLine: lineOf(node),
+          endLine: endLineOf(node)
+        });
+      });
+      return out2;
+    },
+    assertionStrength(a) {
+      const base = STRENGTH[a.matcher] ?? DEFAULT_STRENGTH;
+      if (base >= 80 && a.args.some((arg) => LOOSE_ARG.test(arg))) return 45;
+      return base;
+    }
+  };
+  return adapter;
+}
+var SUITE_NAMES, CASE_NAMES, CHAIN_MODIFIERS, NEGATION_LINKS, STRENGTH, DEFAULT_STRENGTH, LOOSE_ARG, MOCK_CONSTRUCTS, FUNCTION_TYPES;
+var init_typescript = __esm({
+  "src/parsers/typescript.ts"() {
+    "use strict";
+    init_types();
+    init_walk();
+    SUITE_NAMES = /* @__PURE__ */ new Set(["describe", "context", "suite", "xdescribe", "fdescribe"]);
+    CASE_NAMES = /* @__PURE__ */ new Set(["it", "test", "specify", "xit", "xtest", "fit", "bench"]);
+    CHAIN_MODIFIERS = /* @__PURE__ */ new Set([
+      "not",
+      "resolves",
+      "rejects",
+      "to",
+      "be",
+      "been",
+      "have",
+      "has",
+      "that",
+      "which",
+      "with",
+      "and",
+      "is",
+      "a",
+      "an",
+      "does",
+      "deep",
+      "own",
+      "nested",
+      "ordered",
+      "any",
+      "all",
+      "first",
+      "second",
+      "lastCalledWith"
+    ]);
+    NEGATION_LINKS = /* @__PURE__ */ new Set(["not", "rejects", "never"]);
+    STRENGTH = {
+      // Exact value or structure: strongest.
+      toBe: 100,
+      toEqual: 100,
+      toStrictEqual: 110,
+      toMatchObject: 90,
+      toMatchInlineSnapshot: 90,
+      toMatchSnapshot: 85,
+      toHaveBeenCalledWith: 100,
+      toHaveBeenNthCalledWith: 100,
+      toHaveBeenLastCalledWith: 100,
+      toHaveBeenCalledTimes: 90,
+      toHaveLength: 90,
+      toHaveProperty: 85,
+      toContainEqual: 85,
+      toContain: 80,
+      toThrowError: 80,
+      toThrow: 75,
+      toMatch: 80,
+      toBeCloseTo: 85,
+      toBeGreaterThan: 70,
+      toBeLessThan: 70,
+      // Chai / Mocha equivalents.
+      equal: 100,
+      equals: 100,
+      eql: 100,
+      deepEqual: 100,
+      strictEqual: 110,
+      notStrictEqual: 60,
+      include: 80,
+      match: 80,
+      // Weak: type or existence checks only.
+      toBeInstanceOf: 50,
+      toBeTypeOf: 45,
+      instanceOf: 50,
+      toHaveBeenCalled: 40,
+      toBeCalled: 40,
+      toBeDefined: 30,
+      toBeUndefined: 30,
+      toBeNull: 30,
+      toBeNaN: 30,
+      exist: 30,
+      ok: 25,
+      toBeTruthy: 20,
+      toBeFalsy: 20,
+      true: 20,
+      false: 20,
+      // Weakest: asserts nothing about the value at all.
+      toBeAnything: 5
+    };
+    DEFAULT_STRENGTH = 60;
+    LOOSE_ARG = /\b(expect\.(any|anything)|any\(|anything\(|expect\.objectContaining|expect\.arrayContaining|expect\.stringContaining|expect\.stringMatching)/;
+    MOCK_CONSTRUCTS = [
+      { object: "jest", method: "mock" },
+      { object: "jest", method: "doMock" },
+      { object: "jest", method: "spyOn" },
+      { object: "jest", method: "replaceProperty" },
+      { object: "vi", method: "mock" },
+      { object: "vi", method: "doMock" },
+      { object: "vi", method: "spyOn" },
+      { object: "vi", method: "stubGlobal" },
+      { object: "sinon", method: "stub" },
+      { object: "sinon", method: "spy" },
+      { object: "sinon", method: "mock" },
+      { object: "sinon", method: "replace" },
+      { object: "td", method: "replace" }
+    ];
+    FUNCTION_TYPES = [
+      "function_declaration",
+      "function_expression",
+      "generator_function_declaration",
+      "arrow_function",
+      "method_definition"
+    ];
+  }
+});
+
 // src/cli.ts
 import fs5 from "node:fs";
 import { parseArgs } from "node:util";
@@ -13831,27 +14184,98 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import path3 from "node:path";
 import fs3 from "node:fs";
+var cachedDir;
+function candidateDirs() {
+  const out2 = [];
+  const here = path3.dirname(fileURLToPath(import.meta.url));
+  out2.push(path3.join(here, "wasm"));
+  out2.push(path3.resolve(here, "..", "..", "node_modules", "@vscode", "tree-sitter-wasm", "wasm"));
+  for (const base of [import.meta.url, `file://${path3.join(process.cwd(), "index.js")}`]) {
+    try {
+      const require2 = createRequire(base);
+      out2.push(
+        path3.dirname(require2.resolve("@vscode/tree-sitter-wasm/wasm/tree-sitter-ruby.wasm"))
+      );
+    } catch {
+    }
+  }
+  return out2;
+}
+function grammarDir() {
+  if (cachedDir) return cachedDir;
+  for (const dir of candidateDirs()) {
+    if (fs3.existsSync(path3.join(dir, "tree-sitter-ruby.wasm"))) {
+      cachedDir = dir;
+      return dir;
+    }
+  }
+  throw new Error(
+    `nobble: could not locate tree-sitter grammar .wasm files. Looked in:
+  ${candidateDirs().join("\n  ")}`
+  );
+}
+function readGrammar(name2) {
+  return fs3.readFileSync(path3.join(grammarDir(), `tree-sitter-${name2}.wasm`));
+}
 function runtimeWasmPath() {
   const here = path3.dirname(fileURLToPath(import.meta.url));
   const bundled = path3.join(here, "wasm", "tree-sitter-runtime.wasm");
   if (fs3.existsSync(bundled)) return bundled;
-  try {
-    const require2 = createRequire(import.meta.url);
-    return require2.resolve("web-tree-sitter/tree-sitter.wasm");
-  } catch {
-    return void 0;
+  for (const base of [import.meta.url, `file://${path3.join(process.cwd(), "index.js")}`]) {
+    try {
+      return createRequire(base).resolve("web-tree-sitter/tree-sitter.wasm");
+    } catch {
+    }
   }
+  return void 0;
 }
 
 // src/parsers/index.ts
 var initialized = false;
+var languages = /* @__PURE__ */ new Map();
+var parsers = /* @__PURE__ */ new Map();
 async function initParsers() {
   if (initialized) return;
   const runtime = runtimeWasmPath();
   await Parser.init(runtime ? { locateFile: () => runtime } : void 0);
   initialized = true;
 }
+async function getLanguage(name2) {
+  await initParsers();
+  const cached = languages.get(name2);
+  if (cached) return cached;
+  const lang = await Language.load(readGrammar(name2));
+  languages.set(name2, lang);
+  return lang;
+}
+async function getParser(name2) {
+  const cached = parsers.get(name2);
+  if (cached) return cached;
+  const lang = await getLanguage(name2);
+  const parser = new Parser();
+  parser.setLanguage(lang);
+  parsers.set(name2, parser);
+  return parser;
+}
 var adapters = /* @__PURE__ */ new Map();
+async function initAdapters() {
+  if (adapters.size > 0) return;
+  const { createTypeScriptAdapter: createTypeScriptAdapter2 } = await Promise.resolve().then(() => (init_typescript(), typescript_exports));
+  const build = async (grammar, id, extensions) => {
+    const parser = await getParser(grammar);
+    return createTypeScriptAdapter2(id, extensions, (source) => {
+      const tree = parser.parse(source);
+      if (!tree) throw new Error(`failed to parse ${id} source`);
+      return tree;
+    });
+  };
+  registerAdapter(await build("typescript", "typescript", [".ts", ".mts", ".cts"]));
+  registerAdapter(await build("tsx", "tsx", [".tsx", ".jsx"]));
+  registerAdapter(await build("javascript", "javascript", [".js", ".mjs", ".cjs"]));
+}
+function registerAdapter(adapter) {
+  for (const ext of adapter.extensions) adapters.set(ext.toLowerCase(), adapter);
+}
 function adapterForPath(filePath) {
   const dot = filePath.lastIndexOf(".");
   if (dot < 0) return void 0;
@@ -13888,7 +14312,8 @@ async function run2(opts) {
       score: 0,
       verdict: "pass",
       degraded: false,
-      filesAnalyzed: 0
+      filesAnalyzed: 0,
+      testFilesChanged: 0
     };
   }
   let degraded = false;
@@ -13912,7 +14337,10 @@ async function run2(opts) {
     return config.rules[r.id]?.enabled !== false;
   });
   const anyAstRule = rules.some((r) => r.requiresAst);
-  if (anyAstRule) await initParsers();
+  if (anyAstRule) {
+    await initParsers();
+    await initAdapters();
+  }
   const trackedFiles = listTrackedFiles(cwd);
   const snapshots = /* @__PURE__ */ new Map();
   for (const file of files) {
@@ -14014,7 +14442,8 @@ async function run2(opts) {
     verdict: verdictFor(total, config),
     degraded,
     degradedReason,
-    filesAnalyzed: files.length
+    filesAnalyzed: files.length,
+    testFilesChanged: files.filter((f) => f.kind === "test").length
   };
 }
 
@@ -14321,6 +14750,9 @@ function isCommentOnly(line) {
   const t = line.trim();
   return t === "" || t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*") || t.startsWith('"""') || t.startsWith("'''");
 }
+function allTrivial(lines) {
+  return lines.every((l) => isCommentOnly(l.text));
+}
 function extractNumbers(source, keys) {
   const out2 = /* @__PURE__ */ new Map();
   for (const rawLine of source.split("\n")) {
@@ -14333,6 +14765,211 @@ function extractNumbers(source, keys) {
     out2.set(key, [...out2.get(key) ?? [], ...nums]);
   }
   return out2;
+}
+
+// src/rules/block-matching.ts
+function editDistance(a, b, cap = 8) {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > cap) return cap + 1;
+  let prev = Array.from({ length: b.length + 1 }, (_, i2) => i2);
+  for (let i2 = 1; i2 <= a.length; i2++) {
+    const curr = [i2];
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = Math.min(
+        prev[j] + 1,
+        curr[j - 1] + 1,
+        prev[j - 1] + (a[i2 - 1] === b[j - 1] ? 0 : 1)
+      );
+    }
+    prev = curr;
+    if (Math.min(...curr) > cap) return cap + 1;
+  }
+  return prev[b.length];
+}
+function isRename(a, b) {
+  if (a === b) return true;
+  const longer = Math.max(a.length, b.length);
+  if (longer === 0) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  const threshold = Math.max(2, Math.floor(longer * 0.34));
+  return editDistance(a, b, threshold + 1) <= threshold;
+}
+function ownAssertions(block, blocks, adapter) {
+  const all = adapter.findAssertions(block.node);
+  const nested = blocks.filter(
+    (b) => b !== block && b.node.startIndex >= block.node.startIndex && b.node.endIndex <= block.node.endIndex
+  );
+  if (nested.length === 0) return all;
+  return all.filter(
+    (a) => !nested.some(
+      (n) => a.node.startIndex >= n.node.startIndex && a.node.endIndex <= n.node.endIndex
+    )
+  );
+}
+function diffTestBlocks(ctx) {
+  const beforeAdapter = ctx.before?.adapter;
+  const afterAdapter = ctx.after?.adapter;
+  const beforeTree = ctx.before?.tree;
+  const afterTree = ctx.after?.tree;
+  if (!beforeAdapter || !afterAdapter || !beforeTree || !afterTree) return void 0;
+  const beforeBlocks = beforeAdapter.findTestBlocks(beforeTree);
+  const afterBlocks = afterAdapter.findTestBlocks(afterTree);
+  const matched = [];
+  const removed = [];
+  const usedAfter = /* @__PURE__ */ new Set();
+  for (const before of beforeBlocks) {
+    let after = afterBlocks.find(
+      (b) => !usedAfter.has(b) && b.kind === before.kind && b.normalizedName === before.normalizedName
+    );
+    if (!after) {
+      after = afterBlocks.find(
+        (b) => !usedAfter.has(b) && b.kind === before.kind && isRename(before.normalizedName, b.normalizedName)
+      );
+    }
+    if (!after) {
+      removed.push(before);
+      continue;
+    }
+    usedAfter.add(after);
+    matched.push({
+      before,
+      after,
+      beforeAssertions: ownAssertions(before, beforeBlocks, beforeAdapter),
+      afterAssertions: ownAssertions(after, afterBlocks, afterAdapter)
+    });
+  }
+  return {
+    matched,
+    removed,
+    added: afterBlocks.filter((b) => !usedAfter.has(b)),
+    beforeAdapter,
+    afterAdapter,
+    totalBefore: beforeAdapter.findAssertions(beforeTree.rootNode).length,
+    totalAfter: afterAdapter.findAssertions(afterTree.rootNode).length
+  };
+}
+function fileLostAssertions(diff) {
+  return diff.totalAfter < diff.totalBefore;
+}
+function pairedSourceDeleted(ctx) {
+  return ctx.allFiles.some(
+    (f) => f.status === "deleted" && f.kind === "source" && sharesBasename(f.path, ctx.file.path)
+  );
+}
+function sharesBasename(sourcePath, testPath) {
+  const base = (p) => (p.split("/").pop() ?? "").replace(/\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|rb|go)$/, "").replace(/^test_/, "").replace(/[._-](test|spec)$/, "").toLowerCase();
+  const b = base(sourcePath);
+  return b.length > 2 && b === base(testPath);
+}
+
+// src/rules/nob101-assertions-removed.ts
+var nob101 = {
+  id: "NOB-101",
+  title: "Assertions removed from an existing test",
+  defaultSeverity: "high",
+  weight: 30,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The test still exists and still passes, so nothing looks wrong, but it now checks less than it did.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    if (!fileLostAssertions(diff)) return [];
+    const findings = [];
+    for (const m of diff.matched) {
+      const lost = m.beforeAssertions.length - m.afterAssertions.length;
+      if (lost <= 0) continue;
+      const removedTexts = m.beforeAssertions.filter((b) => !m.afterAssertions.some((a) => a.text === b.text)).slice(0, 3).map((a) => a.text);
+      findings.push(
+        makeFinding(ctx, {
+          line: m.after.startLine,
+          endLine: m.after.endLine,
+          message: `${lost} assertion${lost === 1 ? "" : "s"} removed from \`${m.after.name}\` (${m.beforeAssertions.length} \u2192 ${m.afterAssertions.length}).`,
+          before: removedTexts.join("\n") || void 0
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob102-assertion-weakened.ts
+var nob102 = {
+  id: "NOB-102",
+  title: "Assertion weakened",
+  defaultSeverity: "high",
+  weight: 30,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The assertion count is unchanged, so the test looks untouched, but it now accepts values it used to reject.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    const findings = [];
+    for (const m of diff.matched) {
+      if (m.beforeAssertions.length !== m.afterAssertions.length) continue;
+      for (let i2 = 0; i2 < m.beforeAssertions.length; i2++) {
+        const before = m.beforeAssertions[i2];
+        const after = m.afterAssertions[i2];
+        if (before.text === after.text) continue;
+        const beforeStrength = diff.beforeAdapter.assertionStrength(before);
+        const afterStrength = diff.afterAdapter.assertionStrength(after);
+        if (afterStrength >= beforeStrength) continue;
+        const how = before.matcher === after.matcher ? `\`${after.matcher}\` now accepts a wildcard argument` : `\`${before.matcher}\` \u2192 \`${after.matcher}\``;
+        findings.push(
+          makeFinding(ctx, {
+            line: after.startLine,
+            message: `Assertion weakened in \`${m.after.name}\`: ${how}.`,
+            before: before.text,
+            after: after.text
+          })
+        );
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob103-test-deleted.ts
+var nob103 = {
+  id: "NOB-103",
+  title: "Whole test block deleted",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The test is gone rather than fixed. Nothing fails, and the file list shows no deletion, so the loss is invisible in review.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    if (!fileLostAssertions(diff)) return [];
+    const findings = [];
+    for (const block of diff.removed) {
+      if (block.kind === "suite" && diff.removed.some((b) => b.kind === "case")) continue;
+      findings.push(
+        makeFinding(ctx, {
+          // The block is gone from the after-file, so anchor to where it used to start.
+          line: Math.max(1, Math.min(block.startLine, countLines(ctx.after?.source))),
+          message: `Test ${block.kind === "suite" ? "suite" : "case"} \`${block.name}\` was deleted.`,
+          before: block.node.text.split("\n").slice(0, 3).join("\n")
+        })
+      );
+    }
+    return findings;
+  }
+};
+function countLines(source) {
+  if (!source) return 1;
+  return source.split("\n").length;
 }
 
 // src/rules/nob104-test-skipped.ts
@@ -14390,6 +15027,205 @@ var nob104 = {
   }
 };
 
+// src/rules/nob105-expectation-inverted.ts
+var nob105 = {
+  id: "NOB-105",
+  title: "Expected-failure inversion",
+  defaultSeverity: "medium",
+  weight: 15,
+  requiresAst: true,
+  appliesTo: ["test"],
+  rationale: "The expectation was flipped rather than satisfied. The test passes by asserting the behaviour it used to reject.",
+  run(ctx) {
+    if (ctx.degraded) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (pairedSourceDeleted(ctx)) return [];
+    const diff = diffTestBlocks(ctx);
+    if (!diff) return [];
+    const findings = [];
+    for (const m of diff.matched) {
+      if (m.beforeAssertions.length !== m.afterAssertions.length) continue;
+      for (let i2 = 0; i2 < m.beforeAssertions.length; i2++) {
+        const before = m.beforeAssertions[i2];
+        const after = m.afterAssertions[i2];
+        if (before.isNegated || !after.isNegated) continue;
+        if (before.matcher !== after.matcher) continue;
+        findings.push(
+          makeFinding(ctx, {
+            line: after.startLine,
+            message: `Expectation inverted in \`${m.after.name}\`: \`${before.matcher}\` is now negated.`,
+            before: before.text,
+            after: after.text
+          })
+        );
+      }
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob201-sensitive-mock.ts
+function symbolMatcher(patterns) {
+  const compiled = patterns.map((p) => {
+    try {
+      return { source: p, re: new RegExp(p, "i") };
+    } catch {
+      return { source: p, re: new RegExp(p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i") };
+    }
+  });
+  return (target) => compiled.find((c) => c.re.test(target))?.source;
+}
+var nob201 = {
+  id: "NOB-201",
+  title: "Mock introduced around a sensitive symbol",
+  defaultSeverity: "critical",
+  weight: 40,
+  requiresAst: true,
+  appliesTo: ["test", "source"],
+  rationale: "Mocking an authorization or identity boundary removes the very thing the test was there to verify, while looking like ordinary setup.",
+  run(ctx) {
+    const afterTree = ctx.after?.tree;
+    const adapter = ctx.after?.adapter;
+    if (!afterTree || !adapter) return [];
+    const matches = symbolMatcher(ctx.config.sensitiveSymbols);
+    const afterMocks = adapter.findMocks(afterTree);
+    const beforeMocks = ctx.before?.tree && ctx.before.adapter ? ctx.before.adapter.findMocks(ctx.before.tree) : [];
+    const beforeKeys = new Set(beforeMocks.map((m) => `${m.construct}::${m.target}`));
+    const findings = [];
+    for (const mock of afterMocks) {
+      if (beforeKeys.has(`${mock.construct}::${mock.target}`)) continue;
+      const symbol = matches(mock.target);
+      if (!symbol) continue;
+      findings.push(
+        makeFinding(ctx, {
+          line: mock.startLine,
+          message: `Mock added around a sensitive symbol (\`${symbol}\`): \`${mock.construct}\` targeting \`${mock.target}\`.`,
+          after: mock.text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
+// src/rules/nob202-security-untested.ts
+var nob202 = {
+  id: "NOB-202",
+  title: "Security-path source change with no new test coverage",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: true,
+  appliesTo: ["source"],
+  rationale: "Security-relevant behaviour changed while the tests that cover it did not, so nothing verifies the new behaviour.",
+  run(ctx) {
+    if (!ctx.file.isSecurityPath) return [];
+    if (ctx.file.status === "deleted") return [];
+    if (ctx.addedLines.length === 0 || allTrivial(ctx.addedLines)) return [];
+    const paired = ctx.pairedTest;
+    if (!paired) return [];
+    if (paired.changed) {
+      const testFile = paired.file;
+      if (!testFile) return [];
+      const gained = testFile.addedLines.filter(
+        (l) => /\b(expect|assert|should)\b/.test(l.text)
+      ).length;
+      const lost = testFile.removedLines.filter(
+        (l) => /\b(expect|assert|should)\b/.test(l.text)
+      ).length;
+      if (gained >= lost) return [];
+      return [
+        makeFinding(ctx, {
+          line: ctx.addedLines[0].line,
+          message: `Security-path file changed while its test \`${paired.path}\` lost ${lost - gained} assertion(s).`,
+          after: ctx.addedLines[0].text
+        })
+      ];
+    }
+    return [
+      makeFinding(ctx, {
+        line: ctx.addedLines[0].line,
+        message: `Security-path file changed but its paired test \`${paired.path}\` was not touched.`,
+        after: ctx.addedLines[0].text
+      })
+    ];
+  }
+};
+
+// src/rules/nob203-security-bypass.ts
+var UNCONDITIONAL_EXIT = /^\s*(?:return\s+(?:true|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
+var DISABLED_GUARD = [
+  { re: /\bif\s*\(\s*(?:false|0)\s*\)/, label: "if (false)" },
+  { re: /\bif\s+False\s*:/, label: "if False:" },
+  { re: /\bif\s+false\b/, label: "if false" },
+  {
+    re: /\b(?:FEATURE_\w+|flags?\.\w+|isEnabled\w*)\s*=\s*true\b/i,
+    label: "feature flag forced on"
+  }
+];
+function leadingStatements(body2, limit = 2) {
+  if (!body2) return [];
+  const out2 = [];
+  for (let i2 = 0; i2 < body2.namedChildCount && out2.length < limit; i2++) {
+    const child = body2.namedChild(i2);
+    if (!child) continue;
+    if (child.type.includes("comment")) continue;
+    out2.push(child);
+  }
+  return out2;
+}
+var nob203 = {
+  id: "NOB-203",
+  title: "Early return or bypass added in a security path",
+  defaultSeverity: "high",
+  weight: 25,
+  requiresAst: true,
+  appliesTo: ["source"],
+  rationale: "An unconditional exit at the top of a function short-circuits every check below it, so the security logic still exists but never runs.",
+  run(ctx) {
+    if (!ctx.file.isSecurityPath) return [];
+    const tree = ctx.after?.tree;
+    const adapter = ctx.after?.adapter;
+    if (!tree || !adapter) return [];
+    if (ctx.addedLines.length === 0) return [];
+    const addedByLine = new Map(ctx.addedLines.map((l) => [l.line, l.text]));
+    const findings = [];
+    const reported = /* @__PURE__ */ new Set();
+    for (const fn of adapter.findFunctions(tree)) {
+      for (const statement of leadingStatements(fn.bodyNode)) {
+        const line = statement.startPosition.row + 1;
+        const added = addedByLine.get(line);
+        if (added === void 0) continue;
+        if (reported.has(line)) continue;
+        const text = statement.text.trim();
+        if (UNCONDITIONAL_EXIT.test(text)) {
+          reported.add(line);
+          findings.push(
+            makeFinding(ctx, {
+              line,
+              message: `Unconditional early exit added at the top of \`${fn.name}\`: \`${text.replace(/\s+/g, " ")}\`.`,
+              after: added
+            })
+          );
+        }
+      }
+    }
+    for (const line of ctx.addedLines) {
+      if (reported.has(line.line)) continue;
+      const guard = DISABLED_GUARD.find(({ re }) => re.test(line.text));
+      if (!guard) continue;
+      reported.add(line.line);
+      findings.push(
+        makeFinding(ctx, {
+          line: line.line,
+          message: `Security check disabled by construction (${guard.label}): \`${line.text.trim()}\`.`,
+          after: line.text
+        })
+      );
+    }
+    return findings;
+  }
+};
+
 // src/rules/nob301-suppression-added.ts
 var COMMENT_DIRECTIVES = [
   { re: /@ts-ignore\b/, label: "@ts-ignore" },
@@ -14402,6 +15238,21 @@ var COMMENT_DIRECTIVES = [
   { re: /#pragma\s+warning\s+disable\b/, label: "#pragma warning disable" },
   { re: /\bnolint\b/, label: "nolint" }
 ];
+var TARGETED_SUPPRESSION = [
+  /#\s*type:\s*ignore\[[^\]]+\]/,
+  //          # type: ignore[return-value]
+  /#\s*noqa\s*:\s*\w+/,
+  //                     # noqa: F821
+  /eslint-disable(?:-next-line|-line)?\s+[\w@/-]+/,
+  // eslint-disable-next-line no-shadow
+  /rubocop:disable\s+[\w/]+/,
+  //                rubocop:disable Style/Documentation
+  /nolint:\w+/
+  //                              nolint:errcheck
+];
+function isTargeted(text) {
+  return TARGETED_SUPPRESSION.some((re) => re.test(text));
+}
 var CODE_SUPPRESSIONS = [
   { re: /\bas\s+any\b/, label: "as any" },
   { re: /\bas\s+unknown\s+as\b/, label: "as unknown as" }
@@ -14420,10 +15271,11 @@ var nob301 = {
       const text = line.text;
       for (const { re, label } of COMMENT_DIRECTIVES) {
         if (!re.test(text)) continue;
+        if (isTargeted(text)) break;
         return [
           makeFinding(ctx, {
             line: line.line,
-            message: `Suppression added (${label}): \`${text.trim()}\``,
+            message: `Blanket suppression added (${label}): \`${text.trim()}\``,
             after: text
           })
         ];
@@ -14798,9 +15650,25 @@ var done = false;
 function registerAllRules() {
   if (done) return;
   done = true;
-  for (const rule of [nob001, nob104, nob301, nob302, nob303, nob401, nob402, nob403, nob404]) {
-    registerRule(rule);
-  }
+  const rules = [
+    nob001,
+    nob101,
+    nob102,
+    nob103,
+    nob104,
+    nob105,
+    nob201,
+    nob202,
+    nob203,
+    nob301,
+    nob302,
+    nob303,
+    nob401,
+    nob402,
+    nob403,
+    nob404
+  ];
+  for (const rule of rules) registerRule(rule);
 }
 
 // src/cli.ts

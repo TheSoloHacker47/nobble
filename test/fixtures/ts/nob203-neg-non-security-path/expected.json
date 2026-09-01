@@ -1,0 +1,4 @@
+{
+  "note": "The same early return outside a security path is not this rule's business",
+  "findings": []
+}

@@ -1,0 +1,10 @@
+{
+  "note": "An entire describe block removed",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "src/pay.test.ts",
+      "messageContains": "refunds in full"
+    }
+  ]
+}

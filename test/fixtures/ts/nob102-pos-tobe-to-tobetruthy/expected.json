@@ -1,0 +1,10 @@
+{
+  "note": "Exact comparison replaced with a truthiness check",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "src/pay.test.ts",
+      "messageContains": "`toBe` → `toBeTruthy`"
+    }
+  ]
+}

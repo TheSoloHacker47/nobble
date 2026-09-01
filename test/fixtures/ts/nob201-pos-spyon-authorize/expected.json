@@ -1,0 +1,10 @@
+{
+  "note": "spyOn used to stub an authorization check",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "src/pay.test.ts",
+      "messageContains": "authorize"
+    }
+  ]
+}

@@ -41,7 +41,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "smoke": "node --experimental-strip-types scripts/smoke.ts"
+    "smoke": "node scripts/run-smoke.mjs"
   },
   "dependencies": {
     "@actions/core": "^3.0.1",

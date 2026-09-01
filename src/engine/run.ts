@@ -9,7 +9,7 @@ import { findPairedTest } from './pairing.js';
 import { score, verdictFor, sortFindings } from './score.js';
 import { findSuppressions, applySuppressions, type Suppression } from './suppress.js';
 import { allRules } from '../rules/index.js';
-import { adapterForPath, initParsers } from '../parsers/index.js';
+import { adapterForPath, initParsers, initAdapters } from '../parsers/index.js';
 import type { ChangedFile, FileSnapshot, RuleContext, Rule } from '../rules/types.js';
 
 export interface RunOptions {
@@ -60,6 +60,7 @@ export async function run(opts: RunOptions): Promise<AnalysisResult> {
       verdict: 'pass',
       degraded: false,
       filesAnalyzed: 0,
+      testFilesChanged: 0,
     };
   }
 
@@ -89,7 +90,10 @@ export async function run(opts: RunOptions): Promise<AnalysisResult> {
     return config.rules[r.id]?.enabled !== false;
   });
   const anyAstRule = rules.some((r) => r.requiresAst);
-  if (anyAstRule) await initParsers();
+  if (anyAstRule) {
+    await initParsers();
+    await initAdapters();
+  }
 
   const trackedFiles = listTrackedFiles(cwd);
 
@@ -215,5 +219,6 @@ export async function run(opts: RunOptions): Promise<AnalysisResult> {
     degraded,
     degradedReason,
     filesAnalyzed: files.length,
+    testFilesChanged: files.filter((f) => f.kind === 'test').length,
   };
 }

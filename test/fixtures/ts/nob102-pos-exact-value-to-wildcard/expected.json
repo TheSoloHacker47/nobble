@@ -1,0 +1,10 @@
+{
+  "note": "Exact argument replaced with expect.any, keeping the same matcher",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "src/pay.test.ts",
+      "messageContains": "wildcard"
+    }
+  ]
+}

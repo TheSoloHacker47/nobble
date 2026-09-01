@@ -1,0 +1,13 @@
+{
+  "note": "Two assertions inverted in the same test",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "src/pay.test.ts"
+    },
+    {
+      "ruleId": "NOB-105",
+      "file": "src/pay.test.ts"
+    }
+  ]
+}

@@ -41,6 +41,7 @@ const result = (over: Partial<AnalysisResult> = {}): AnalysisResult => ({
   verdict: 'block',
   degraded: false,
   filesAnalyzed: 4,
+  testFilesChanged: 2,
   ...over,
 });
 

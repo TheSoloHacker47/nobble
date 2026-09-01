@@ -1,0 +1,10 @@
+{
+  "note": "return true added as the first statement of an authorization function",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "src/policies/admin.ts",
+      "messageContains": "canAdmin"
+    }
+  ]
+}

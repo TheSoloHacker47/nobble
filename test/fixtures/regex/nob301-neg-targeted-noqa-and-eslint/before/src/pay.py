@@ -1,0 +1,1 @@
+raise SomeError(message)
