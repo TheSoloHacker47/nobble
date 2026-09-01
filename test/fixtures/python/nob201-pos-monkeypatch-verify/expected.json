@@ -1,0 +1,10 @@
+{
+  "note": "monkeypatch.setattr used to stub a signature check",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "tests/test_pay.py",
+      "messageContains": "verify"
+    }
+  ]
+}

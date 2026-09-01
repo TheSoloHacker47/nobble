@@ -1,0 +1,10 @@
+{
+  "note": "An entire describe block removed",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "refunds in full"
+    }
+  ]
+}

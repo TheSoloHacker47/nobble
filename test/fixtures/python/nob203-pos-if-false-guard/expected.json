@@ -1,0 +1,10 @@
+{
+  "note": "A permission check disabled by wrapping it in if False",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "app/permissions/check.py",
+      "messageContains": "if False"
+    }
+  ]
+}

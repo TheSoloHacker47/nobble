@@ -66,22 +66,30 @@ const adapters = new Map<string, LanguageAdapter>();
  */
 export async function initAdapters(): Promise<void> {
   if (adapters.size > 0) return;
-  const { createTypeScriptAdapter } = await import('./typescript.js');
+  const [{ createTypeScriptAdapter }, { createRubyAdapter }, { createPythonAdapter }] =
+    await Promise.all([import('./typescript.js'), import('./ruby.js'), import('./python.js')]);
 
-  const build = async (grammar: GrammarName, id: string, extensions: string[]) => {
+  /** Binds a grammar's parser into the `parse(source) => Tree` an adapter expects. */
+  const parseWith = async (grammar: GrammarName) => {
     const parser = await getParser(grammar);
-    return createTypeScriptAdapter(id, extensions, (source: string) => {
+    return (source: string) => {
       const tree = parser.parse(source);
-      if (!tree) throw new Error(`failed to parse ${id} source`);
+      if (!tree) throw new Error(`failed to parse ${grammar} source`);
       return tree;
-    });
+    };
   };
 
-  registerAdapter(await build('typescript', 'typescript', ['.ts', '.mts', '.cts']));
+  registerAdapter(
+    createTypeScriptAdapter('typescript', ['.ts', '.mts', '.cts'], await parseWith('typescript')),
+  );
   // TSX and JSX share a grammar; plain JS parses correctly under it too, and using one
   // grammar for all three avoids a JSX file failing because it was sent to the TS parser.
-  registerAdapter(await build('tsx', 'tsx', ['.tsx', '.jsx']));
-  registerAdapter(await build('javascript', 'javascript', ['.js', '.mjs', '.cjs']));
+  registerAdapter(createTypeScriptAdapter('tsx', ['.tsx', '.jsx'], await parseWith('tsx')));
+  registerAdapter(
+    createTypeScriptAdapter('javascript', ['.js', '.mjs', '.cjs'], await parseWith('javascript')),
+  );
+  registerAdapter(createRubyAdapter(await parseWith('ruby')));
+  registerAdapter(createPythonAdapter(await parseWith('python')));
 }
 
 export function registerAdapter(adapter: LanguageAdapter): void {

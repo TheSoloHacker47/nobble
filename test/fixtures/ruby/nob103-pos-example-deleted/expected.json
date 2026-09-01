@@ -1,0 +1,10 @@
+{
+  "note": "A whole RSpec example removed",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "rejects an expired card"
+    }
+  ]
+}

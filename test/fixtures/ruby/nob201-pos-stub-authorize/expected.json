@@ -1,0 +1,10 @@
+{
+  "note": "An authorization check stubbed out",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "authorize"
+    }
+  ]
+}

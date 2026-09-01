@@ -32,5 +32,12 @@ await esbuild.build({
   },
 });
 
-const res = spawnSync('node', [out, ...process.argv.slice(2)], { stdio: 'inherit', cwd: root });
+// The bundle runs from a temp directory, so `import.meta.dirname` inside it points there
+// rather than at the repo. Pass the real root explicitly so the clone cache lands in the
+// project (and gets gitignored) instead of beside the OS temp dir.
+const res = spawnSync('node', [out, ...process.argv.slice(2)], {
+  stdio: 'inherit',
+  cwd: root,
+  env: { ...process.env, NOBBLE_SMOKE_ROOT: root },
+});
 process.exit(res.status ?? 1);

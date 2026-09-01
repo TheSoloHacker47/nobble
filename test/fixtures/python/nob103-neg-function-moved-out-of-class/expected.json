@@ -1,0 +1,4 @@
+{
+  "note": "Moving a test from a TestCase to module level keeps every assertion",
+  "findings": []
+}

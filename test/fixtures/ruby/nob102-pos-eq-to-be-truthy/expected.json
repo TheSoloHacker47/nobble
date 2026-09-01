@@ -1,0 +1,10 @@
+{
+  "note": "eq downgraded to be_truthy",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "eq"
+    }
+  ]
+}

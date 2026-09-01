@@ -1,0 +1,9 @@
+{
+  "note": "unittest assertions removed from a TestCase method",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "tests/test_pay.py"
+    }
+  ]
+}

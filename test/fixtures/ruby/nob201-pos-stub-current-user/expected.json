@@ -1,0 +1,10 @@
+{
+  "note": "allow(...).to receive(:current_user) introduced",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "current_user"
+    }
+  ]
+}

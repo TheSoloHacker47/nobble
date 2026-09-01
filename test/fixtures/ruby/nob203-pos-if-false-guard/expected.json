@@ -1,0 +1,10 @@
+{
+  "note": "A permission check disabled by wrapping it in if false",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "app/permissions/check.rb",
+      "messageContains": "if false"
+    }
+  ]
+}

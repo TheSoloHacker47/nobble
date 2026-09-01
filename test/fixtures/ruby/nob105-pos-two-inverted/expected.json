@@ -1,0 +1,13 @@
+{
+  "note": "Two expectations inverted in one example",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "spec/pay_spec.rb"
+    },
+    {
+      "ruleId": "NOB-105",
+      "file": "spec/pay_spec.rb"
+    }
+  ]
+}

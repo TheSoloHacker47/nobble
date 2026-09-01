@@ -1,0 +1,9 @@
+{
+  "note": "head :ok short-circuits a controller authorization filter",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "app/middleware/auth_filter.rb"
+    }
+  ]
+}

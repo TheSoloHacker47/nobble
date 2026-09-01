@@ -1,0 +1,15 @@
+{
+  "note": "Two test functions each lose an assert",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "tests/test_pay.py",
+      "messageContains": "test_charges"
+    },
+    {
+      "ruleId": "NOB-101",
+      "file": "tests/test_pay.py",
+      "messageContains": "test_refunds"
+    }
+  ]
+}

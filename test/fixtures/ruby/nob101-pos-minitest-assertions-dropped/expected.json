@@ -1,0 +1,9 @@
+{
+  "note": "Minitest assertions removed from a test method",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "test/pay_test.rb"
+    }
+  ]
+}

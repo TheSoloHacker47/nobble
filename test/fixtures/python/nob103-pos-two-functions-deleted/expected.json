@@ -1,0 +1,15 @@
+{
+  "note": "Two test functions removed gives two findings",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "tests/test_pay.py",
+      "messageContains": "test_beta_two"
+    },
+    {
+      "ruleId": "NOB-103",
+      "file": "tests/test_pay.py",
+      "messageContains": "test_gamma_three"
+    }
+  ]
+}

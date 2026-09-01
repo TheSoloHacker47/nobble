@@ -44,7 +44,10 @@ const { values } = parseArgs({
 
 const repos = values.repo?.length ? values.repo : DEFAULT_REPOS;
 const limit = Number(values.limit);
-const cacheDir = path.resolve(import.meta.dirname, '..', '.smoke-cache');
+// NOBBLE_SMOKE_ROOT is set by run-smoke.mjs; `import.meta.dirname` would be the temp
+// directory the bundle was written to.
+const projectRoot = process.env.NOBBLE_SMOKE_ROOT ?? path.resolve(import.meta.dirname, '..');
+const cacheDir = path.join(projectRoot, '.smoke-cache');
 
 interface PrResult {
   repo: string;
@@ -54,6 +57,7 @@ interface PrResult {
   score: number;
   /** Whether this PR touched any test file at all. See the note in main(). */
   touchedTests: boolean;
+  verdict: 'pass' | 'warn' | 'block';
   error?: string;
 }
 
@@ -131,7 +135,14 @@ async function analyzePr(repo: string, dir: string, pr: PrMeta): Promise<PrResul
       first = parents[1]!;
       second = pr.mergeCommit;
     } else {
-      return { ...base, findings: [], score: 0, touchedTests: false, error: 'no parent commit' };
+      return {
+        ...base,
+        findings: [],
+        score: 0,
+        touchedTests: false,
+        verdict: 'pass',
+        error: 'no parent commit',
+      };
     }
 
     const diffText = sh(
@@ -145,7 +156,8 @@ async function analyzePr(repo: string, dir: string, pr: PrMeta): Promise<PrResul
       ['diff', '--no-color', '--no-ext-diff', '-M', `${first}...${second}`],
       dir,
     );
-    if (!diffText.trim()) return { ...base, findings: [], score: 0, touchedTests: false };
+    if (!diffText.trim())
+      return { ...base, findings: [], score: 0, touchedTests: false, verdict: 'pass' };
 
     const result = await run({
       diffText,
@@ -168,6 +180,7 @@ async function analyzePr(repo: string, dir: string, pr: PrMeta): Promise<PrResul
       findings: result.findings,
       score: result.score,
       touchedTests: result.testFilesChanged > 0,
+      verdict: result.verdict,
     };
   } catch (err) {
     return {
@@ -175,6 +188,7 @@ async function analyzePr(repo: string, dir: string, pr: PrMeta): Promise<PrResul
       findings: [],
       score: 0,
       touchedTests: false,
+      verdict: 'pass',
       error: err instanceof Error ? err.message : String(err),
     };
   }
@@ -232,6 +246,18 @@ async function main(): Promise<void> {
   const touchedRate = touched.length ? (touchedFlagged.length / touched.length) * 100 : 0;
   console.log(
     `  of the ${touched.length} PRs that touched a test file: ${touchedFlagged.length} flagged (${touchedRate.toFixed(1)}%)`,
+  );
+
+  // The number that decides whether the tool is tolerable in CI. The default posture is
+  // non-blocking, and only `block` is loud, so this is the rate that would actually
+  // interrupt anyone if they opted into `fail-on: block`.
+  const blocked = analyzed.filter((r) => r.verdict === 'block');
+  const warned = analyzed.filter((r) => r.verdict === 'warn');
+  console.log(
+    `verdicts:  ${blocked.length} block, ${warned.length} warn, ${analyzed.length - blocked.length - warned.length} pass`,
+  );
+  console.log(
+    `  block rate: ${((blocked.length / Math.max(1, analyzed.length)) * 100).toFixed(1)}% of all PRs`,
   );
   console.log(`elapsed:   ${((Date.now() - started) / 1000).toFixed(0)}s`);
 

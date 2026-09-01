@@ -1,0 +1,10 @@
+{
+  "note": "An instance_double standing in for the session store",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "session"
+    }
+  ]
+}

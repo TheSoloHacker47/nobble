@@ -4070,8 +4070,9 @@ function editDistance(a, b, cap = 8) {
 function isRename(a, b) {
   if (a === b) return true;
   const longer = Math.max(a.length, b.length);
+  const shorter = Math.min(a.length, b.length);
   if (longer === 0) return true;
-  if (a.includes(b) || b.includes(a)) return true;
+  if ((a.includes(b) || b.includes(a)) && shorter >= longer * 0.6) return true;
   const threshold = Math.max(2, Math.floor(longer * 0.34));
   return editDistance(a, b, threshold + 1) <= threshold;
 }
@@ -4097,15 +4098,22 @@ function diffTestBlocks(ctx) {
   const afterBlocks = afterAdapter.findTestBlocks(afterTree);
   const matched = [];
   const removed = [];
+  const ambiguous = [];
   const usedAfter = /* @__PURE__ */ new Set();
   for (const before of beforeBlocks) {
     let after = afterBlocks.find(
       (b) => !usedAfter.has(b) && b.kind === before.kind && b.normalizedName === before.normalizedName
     );
     if (!after) {
-      after = afterBlocks.find(
+      const candidates = afterBlocks.filter(
         (b) => !usedAfter.has(b) && b.kind === before.kind && isRename(before.normalizedName, b.normalizedName)
       );
+      if (candidates.length > 1) {
+        ambiguous.push(before);
+        for (const c of candidates) usedAfter.add(c);
+        continue;
+      }
+      after = candidates[0];
     }
     if (!after) {
       removed.push(before);
@@ -4122,6 +4130,7 @@ function diffTestBlocks(ctx) {
   return {
     matched,
     removed,
+    ambiguous,
     added: afterBlocks.filter((b) => !usedAfter.has(b)),
     beforeAdapter,
     afterAdapter,
@@ -4433,7 +4442,7 @@ var nob202 = {
 };
 
 // src/rules/nob203-security-bypass.ts
-var UNCONDITIONAL_EXIT = /^\s*(?:return\s+(?:true|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
+var UNCONDITIONAL_EXIT = /^\s*(?:return\s+(?:true|True|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
 var DISABLED_GUARD = [
   { re: /\bif\s*\(\s*(?:false|0)\s*\)/, label: "if (false)" },
   { re: /\bif\s+False\s*:/, label: "if False:" },

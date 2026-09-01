@@ -1,0 +1,15 @@
+{
+  "note": "Two examples removed gives two findings",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "beta two"
+    },
+    {
+      "ruleId": "NOB-103",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "gamma three"
+    }
+  ]
+}

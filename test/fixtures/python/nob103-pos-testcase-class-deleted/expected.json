@@ -1,0 +1,10 @@
+{
+  "note": "An entire TestCase class removed",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "tests/test_pay.py",
+      "messageContains": "test_refunds_in_full"
+    }
+  ]
+}

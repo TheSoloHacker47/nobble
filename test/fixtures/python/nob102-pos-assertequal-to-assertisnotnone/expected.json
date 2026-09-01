@@ -1,0 +1,10 @@
+{
+  "note": "assertEqual downgraded to an existence check",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "tests/test_pay.py",
+      "messageContains": "assertIsNotNone"
+    }
+  ]
+}

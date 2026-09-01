@@ -1,0 +1,4 @@
+{
+  "note": "eq to eql is a lateral move, not a weakening",
+  "findings": []
+}

@@ -1,0 +1,9 @@
+{
+  "note": "The `to_not` spelling counts as the same inversion",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "spec/pay_spec.rb"
+    }
+  ]
+}

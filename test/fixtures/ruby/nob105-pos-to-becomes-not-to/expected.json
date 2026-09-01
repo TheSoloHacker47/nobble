@@ -1,0 +1,10 @@
+{
+  "note": "RSpec `to` inverted to `not_to`",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "inverted"
+    }
+  ]
+}

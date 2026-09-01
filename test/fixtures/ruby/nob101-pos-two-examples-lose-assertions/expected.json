@@ -1,0 +1,15 @@
+{
+  "note": "Two examples each lose an assertion",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "charges"
+    },
+    {
+      "ruleId": "NOB-101",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "refunds"
+    }
+  ]
+}

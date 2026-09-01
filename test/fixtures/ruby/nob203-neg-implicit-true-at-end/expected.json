@@ -1,0 +1,4 @@
+{
+  "note": "A method ending in true is a normal predicate, not a bypass",
+  "findings": []
+}

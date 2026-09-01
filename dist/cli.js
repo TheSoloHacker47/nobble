@@ -9587,6 +9587,554 @@ var init_typescript = __esm({
   }
 });
 
+// src/parsers/ruby.ts
+var ruby_exports = {};
+__export(ruby_exports, {
+  createRubyAdapter: () => createRubyAdapter
+});
+function denegate(method) {
+  return method.replace(/^refute(_|$)/, "assert$1").replace(/^assert_not_/, "assert_");
+}
+function callName(node) {
+  const method = node.childForFieldName("method");
+  if (method) return method.text;
+  const first = node.namedChild(0);
+  return first?.type === "identifier" ? first.text : void 0;
+}
+function receiverOf(node) {
+  return node.childForFieldName("receiver");
+}
+function blockOf(node) {
+  for (let i2 = 0; i2 < node.namedChildCount; i2++) {
+    const child = node.namedChild(i2);
+    if (child && (child.type === "do_block" || child.type === "block")) return child;
+  }
+  return null;
+}
+function firstStringArgument(node) {
+  const args2 = node.childForFieldName("arguments") ?? node.namedChild(1);
+  if (!args2) return void 0;
+  for (let i2 = 0; i2 < args2.namedChildCount; i2++) {
+    const child = args2.namedChild(i2);
+    if (!child) continue;
+    if (child.type === "string") {
+      const content = child.namedChild(0);
+      return content ? content.text : child.text.replace(/^['"]|['"]$/g, "");
+    }
+    if (child.type === "constant" || child.type === "simple_symbol") {
+      return child.text.replace(/^:/, "");
+    }
+  }
+  return void 0;
+}
+function firstArgumentText(node) {
+  const args2 = argumentList(node);
+  const first = args2?.namedChild(0);
+  return first ? first.text : void 0;
+}
+function argumentList(node) {
+  const named = node.childForFieldName("arguments");
+  if (named) return named;
+  for (let i2 = 0; i2 < node.namedChildCount; i2++) {
+    const child = node.namedChild(i2);
+    if (child?.type === "argument_list") return child;
+  }
+  return null;
+}
+function createRubyAdapter(parse) {
+  return {
+    id: "ruby",
+    extensions: [".rb", ".rake"],
+    parse,
+    findTestBlocks(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type === "class") {
+          const name3 = node.childForFieldName("name")?.text;
+          if (!name3 || !TEST_CLASS.test(name3)) return;
+          out2.push({
+            name: name3,
+            normalizedName: normalizeName(name3),
+            kind: "suite",
+            node,
+            startLine: lineOf(node),
+            endLine: endLineOf(node)
+          });
+          return;
+        }
+        if (node.type === "method") {
+          const name3 = node.childForFieldName("name")?.text;
+          if (!name3 || !TEST_METHOD.test(name3)) return;
+          out2.push({
+            name: name3,
+            normalizedName: normalizeName(name3),
+            kind: "case",
+            node,
+            startLine: lineOf(node),
+            endLine: endLineOf(node)
+          });
+          return;
+        }
+        if (node.type !== "call") return;
+        const name2 = callName(node);
+        if (!name2) return;
+        const isSuite = SUITE_NAMES2.has(name2);
+        const isCase = CASE_NAMES2.has(name2);
+        if (!isSuite && !isCase) return;
+        if (!blockOf(node)) return;
+        const title = firstStringArgument(node);
+        if (title === void 0) return;
+        out2.push({
+          name: title,
+          normalizedName: normalizeName(title),
+          kind: isSuite ? "suite" : "case",
+          node,
+          startLine: lineOf(node),
+          endLine: endLineOf(node)
+        });
+      });
+      return out2;
+    },
+    findAssertions(node) {
+      const out2 = [];
+      walk(node, (n) => {
+        if (n.type !== "call") return;
+        const name2 = callName(n);
+        if (!name2) return;
+        if (EXPECT_VERBS.has(name2)) {
+          const receiver = receiverOf(n);
+          const receiverName = receiver ? receiver.type === "call" ? callName(receiver) : receiver.text : void 0;
+          if (!receiverName || !IMPLICIT_SUBJECT.has(receiverName)) return;
+          const args2 = argumentList(n);
+          const matcherNode = args2?.namedChild(0) ?? null;
+          const matcher = matcherNode ? matcherNode.type === "call" ? callName(matcherNode) ?? matcherNode.text : matcherNode.text : "to";
+          out2.push({
+            node: n,
+            startLine: lineOf(n),
+            matcher,
+            text: textOf(n),
+            isNegated: NEGATED_VERBS.has(name2),
+            args: matcherNode?.type === "call" ? argTexts(argumentList(matcherNode)) : []
+          });
+          return;
+        }
+        if (BARE_ASSERTION.test(name2)) {
+          out2.push({
+            node: n,
+            startLine: lineOf(n),
+            matcher: denegate(name2),
+            text: textOf(n),
+            isNegated: name2.startsWith("refute") || /_not_/.test(name2),
+            args: argTexts(argumentList(n))
+          });
+        }
+      });
+      return out2;
+    },
+    findMocks(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "call") return;
+        const name2 = callName(node);
+        if (!name2) return;
+        if (EXPECT_VERBS.has(name2)) {
+          const receiver = receiverOf(node);
+          if (!receiver || receiver.type !== "call") return;
+          const receiverName = callName(receiver);
+          if (!receiverName || !MOCK_RECEIVERS.has(receiverName)) return;
+          const args2 = argumentList(node);
+          const first = args2?.namedChild(0);
+          if (!first) return;
+          let receiveCall = first;
+          while (receiveCall && receiveCall.type === "call" && callName(receiveCall) !== "receive") {
+            receiveCall = receiverOf(receiveCall);
+          }
+          if (!receiveCall || callName(receiveCall) !== "receive") return;
+          const message = firstStringArgument(receiveCall);
+          const subject = firstArgumentText(receiver) ?? firstStringArgument(receiver) ?? receiver.text;
+          out2.push({
+            node,
+            startLine: lineOf(node),
+            target: message ? `${subject}.${message}` : subject,
+            construct: `${receiverName}(...).${name2} receive`,
+            text: textOf(node)
+          });
+          return;
+        }
+        if (DOUBLE_BUILDERS.has(name2)) {
+          const target = firstStringArgument(node);
+          if (!target) return;
+          out2.push({
+            node,
+            startLine: lineOf(node),
+            target,
+            construct: name2,
+            text: textOf(node)
+          });
+        }
+      });
+      return out2;
+    },
+    findFunctions(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "method" && node.type !== "singleton_method") return;
+        const nameNode = node.childForFieldName("name");
+        out2.push({
+          name: nameNode?.text ?? "<anonymous>",
+          node,
+          bodyNode: node.childForFieldName("body"),
+          startLine: lineOf(node),
+          endLine: endLineOf(node)
+        });
+      });
+      return out2;
+    },
+    assertionStrength(a) {
+      const base = STRENGTH2[a.matcher] ?? DEFAULT_STRENGTH2;
+      if (base >= 80 && a.args.some((arg) => LOOSE_ARG2.test(arg))) return 45;
+      return base;
+    }
+  };
+}
+var SUITE_NAMES2, CASE_NAMES2, EXPECT_VERBS, NEGATED_VERBS, STRENGTH2, DEFAULT_STRENGTH2, LOOSE_ARG2, BARE_ASSERTION, TEST_METHOD, TEST_CLASS, IMPLICIT_SUBJECT, MOCK_RECEIVERS, DOUBLE_BUILDERS;
+var init_ruby = __esm({
+  "src/parsers/ruby.ts"() {
+    "use strict";
+    init_types();
+    init_walk();
+    SUITE_NAMES2 = /* @__PURE__ */ new Set([
+      "describe",
+      "context",
+      "xdescribe",
+      "xcontext",
+      "feature",
+      "shared_examples"
+    ]);
+    CASE_NAMES2 = /* @__PURE__ */ new Set([
+      "it",
+      "specify",
+      "example",
+      "scenario",
+      "xit",
+      "xspecify",
+      "fit",
+      "test"
+    ]);
+    EXPECT_VERBS = /* @__PURE__ */ new Set(["to", "not_to", "to_not"]);
+    NEGATED_VERBS = /* @__PURE__ */ new Set(["not_to", "to_not"]);
+    STRENGTH2 = {
+      // Exact value or structure.
+      eq: 100,
+      eql: 100,
+      equal: 110,
+      match: 80,
+      match_array: 90,
+      contain_exactly: 95,
+      have_attributes: 90,
+      include: 80,
+      start_with: 80,
+      end_with: 80,
+      raise_error: 80,
+      change: 80,
+      have_received: 85,
+      // Minitest.
+      assert_equal: 100,
+      assert_same: 110,
+      assert_match: 80,
+      assert_includes: 80,
+      assert_raises: 80,
+      refute_equal: 60,
+      // Weak: type or existence only.
+      be_a: 50,
+      be_an: 50,
+      be_kind_of: 50,
+      be_instance_of: 50,
+      be_within: 70,
+      assert_kind_of: 50,
+      assert_instance_of: 50,
+      be_present: 25,
+      be_truthy: 20,
+      be_falsey: 20,
+      be_falsy: 20,
+      be_nil: 30,
+      be_empty: 40,
+      be: 60,
+      assert: 25,
+      assert_nil: 30,
+      assert_not_nil: 25,
+      refute_nil: 25,
+      assert_predicate: 45
+    };
+    DEFAULT_STRENGTH2 = 60;
+    LOOSE_ARG2 = /\b(anything|any_args|instance_of|kind_of|be_a_kind_of|hash_including|a_string_matching)\b/;
+    BARE_ASSERTION = /^(assert|refute)(_\w+)?$/;
+    TEST_METHOD = /^test_/;
+    TEST_CLASS = /Test$|^Test/;
+    IMPLICIT_SUBJECT = /* @__PURE__ */ new Set(["is_expected", "expect"]);
+    MOCK_RECEIVERS = /* @__PURE__ */ new Set([
+      "allow",
+      "expect",
+      "allow_any_instance_of",
+      "expect_any_instance_of"
+    ]);
+    DOUBLE_BUILDERS = /* @__PURE__ */ new Set([
+      "double",
+      "instance_double",
+      "class_double",
+      "object_double",
+      "spy",
+      "stub_const"
+    ]);
+  }
+});
+
+// src/parsers/python.ts
+var python_exports = {};
+__export(python_exports, {
+  createPythonAdapter: () => createPythonAdapter
+});
+function denegate2(method) {
+  return method.replace(/^assertNotEqual$/, "assertEqual").replace(/^assertNotIn$/, "assertIn").replace(/^assertIsNot$/, "assertIs").replace(/^assertIsNone$/, "assertIsNotNone").replace(/^assertFalse$/, "assertTrue").replace(/^assert_not_called$/, "assert_called");
+}
+function attributeParts(node) {
+  if (node.type === "identifier") return [node.text];
+  if (node.type !== "attribute") return void 0;
+  const object = node.childForFieldName("object");
+  const attr = node.childForFieldName("attribute");
+  if (!object || !attr) return void 0;
+  const head = attributeParts(object);
+  if (!head) return [attr.text];
+  return [...head, attr.text];
+}
+function calleeParts(call) {
+  const fn = call.childForFieldName("function");
+  return fn ? attributeParts(fn) : void 0;
+}
+function stringArg(args2, index = 0) {
+  if (!args2) return void 0;
+  const child = args2.namedChild(index);
+  if (!child) return void 0;
+  if (child.type === "string") {
+    for (let i2 = 0; i2 < child.namedChildCount; i2++) {
+      const part = child.namedChild(i2);
+      if (part?.type === "string_content") return part.text;
+    }
+    return child.text.replace(/^['"]|['"]$/g, "");
+  }
+  return child.text;
+}
+function enclosingClassName(node) {
+  let current = node.parent;
+  while (current) {
+    if (current.type === "class_definition") {
+      return current.childForFieldName("name")?.text;
+    }
+    current = current.parent;
+  }
+  return void 0;
+}
+function createPythonAdapter(parse) {
+  return {
+    id: "python",
+    extensions: [".py"],
+    parse,
+    findTestBlocks(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type === "class_definition") {
+          const name3 = node.childForFieldName("name")?.text;
+          if (!name3 || !TEST_CLASS2.test(name3)) return;
+          out2.push({
+            name: name3,
+            normalizedName: normalizeName(name3),
+            kind: "suite",
+            node,
+            startLine: lineOf(node),
+            endLine: endLineOf(node)
+          });
+          return;
+        }
+        if (node.type !== "function_definition") return;
+        const name2 = node.childForFieldName("name")?.text;
+        if (!name2 || !TEST_FUNCTION.test(name2)) return;
+        const cls = enclosingClassName(node);
+        const qualified = cls ? `${cls}.${name2}` : name2;
+        out2.push({
+          name: qualified,
+          normalizedName: normalizeName(qualified),
+          kind: "case",
+          node,
+          startLine: lineOf(node),
+          endLine: endLineOf(node)
+        });
+      });
+      return out2;
+    },
+    findAssertions(node) {
+      const out2 = [];
+      walk(node, (n) => {
+        if (n.type === "assert_statement") {
+          const expr = n.namedChild(0);
+          out2.push({
+            node: n,
+            startLine: lineOf(n),
+            matcher: "assert",
+            text: textOf(n),
+            // `assert x != y` is a negated assertion.
+            isNegated: expr?.type === "comparison_operator" && /(!=|not\s+in|is\s+not)/.test(expr.text),
+            args: expr ? [textOf(expr, 80)] : []
+          });
+          return;
+        }
+        if (n.type !== "call") return;
+        const parts2 = calleeParts(n);
+        if (!parts2 || parts2.length === 0) return;
+        const method = parts2[parts2.length - 1];
+        const isUnittest = UNITTEST_ASSERTION.test(method);
+        const isMockAssert = MOCK_ASSERTION.test(method);
+        const isPytestRaises = parts2.length >= 2 && parts2[parts2.length - 2] === "pytest" && method === "raises";
+        if (!isUnittest && !isMockAssert && !isPytestRaises) return;
+        out2.push({
+          node: n,
+          startLine: lineOf(n),
+          matcher: isPytestRaises ? "assertRaises" : denegate2(method),
+          text: textOf(n),
+          isNegated: NEGATED.test(method) || /not_called/.test(method),
+          args: argTexts(n.childForFieldName("arguments"))
+        });
+      });
+      return out2;
+    },
+    findMocks(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "call") return;
+        const parts2 = calleeParts(node);
+        if (!parts2 || parts2.length < 2) return;
+        const method = parts2[parts2.length - 1];
+        const object = parts2[parts2.length - 2];
+        const known = MOCK_CONSTRUCTS2.some((c) => c.object === object && c.method === method);
+        const isPatchAttr = method === "patch" || method === "patch.object";
+        if (!known && !isPatchAttr) return;
+        const args2 = node.childForFieldName("arguments");
+        const first = stringArg(args2, 0);
+        const second = method === "setattr" || method === "setitem" ? stringArg(args2, 1) : void 0;
+        const target = second ? `${first}.${second}` : first ?? "";
+        if (!target) return;
+        out2.push({
+          node,
+          startLine: lineOf(node),
+          target,
+          construct: `${object}.${method}`,
+          text: textOf(node)
+        });
+      });
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "decorator") return;
+        const call = node.namedChild(0);
+        if (!call || call.type !== "call") return;
+        const parts2 = calleeParts(call);
+        if (!parts2) return;
+        const method = parts2[parts2.length - 1];
+        if (method !== "patch" && method !== "object") return;
+        const target = stringArg(call.childForFieldName("arguments"), 0);
+        if (!target) return;
+        if (out2.some((m) => m.startLine === lineOf(call))) return;
+        out2.push({
+          node,
+          startLine: lineOf(node),
+          target,
+          construct: `@${parts2.join(".")}`,
+          text: textOf(node)
+        });
+      });
+      return out2;
+    },
+    findFunctions(tree) {
+      const out2 = [];
+      walk(tree.rootNode, (node) => {
+        if (node.type !== "function_definition") return;
+        out2.push({
+          name: node.childForFieldName("name")?.text ?? "<anonymous>",
+          node,
+          bodyNode: node.childForFieldName("body"),
+          startLine: lineOf(node),
+          endLine: endLineOf(node)
+        });
+      });
+      return out2;
+    },
+    assertionStrength(a) {
+      if (a.matcher === "assert") {
+        const expr = a.args[0] ?? "";
+        if (/(==|!=|\bis\b|\bin\b|<=|>=|<|>)/.test(expr)) return STRENGTH3.assertEqual;
+        return 25;
+      }
+      const base = STRENGTH3[a.matcher] ?? DEFAULT_STRENGTH3;
+      if (base >= 80 && a.args.some((arg) => LOOSE_ARG3.test(arg))) return 45;
+      return base;
+    }
+  };
+}
+var TEST_FUNCTION, TEST_CLASS2, STRENGTH3, DEFAULT_STRENGTH3, LOOSE_ARG3, UNITTEST_ASSERTION, MOCK_ASSERTION, NEGATED, MOCK_CONSTRUCTS2;
+var init_python = __esm({
+  "src/parsers/python.ts"() {
+    "use strict";
+    init_types();
+    init_walk();
+    TEST_FUNCTION = /^test_?/i;
+    TEST_CLASS2 = /^Test/;
+    STRENGTH3 = {
+      // Exact value or structure.
+      assertEqual: 100,
+      assertEquals: 100,
+      assertIs: 110,
+      assertDictEqual: 100,
+      assertListEqual: 100,
+      assertSetEqual: 100,
+      assertTupleEqual: 100,
+      assertMultiLineEqual: 100,
+      assertSequenceEqual: 100,
+      assertCountEqual: 90,
+      assertRaises: 80,
+      assertRaisesRegex: 90,
+      assertRegex: 80,
+      assertIn: 80,
+      assertAlmostEqual: 85,
+      assert_called_once_with: 100,
+      assert_called_with: 100,
+      assert_has_calls: 90,
+      // A bare `assert` carries whatever the expression says; treat a comparison as strong
+      // and a bare truthiness check as weak (resolved in `assertionStrength`).
+      assert: 90,
+      // Weak: type or existence only.
+      assertIsInstance: 50,
+      assertIsNotNone: 25,
+      assertIsNone: 30,
+      assertTrue: 20,
+      assertFalse: 20,
+      assertNotEqual: 60,
+      assert_called: 40,
+      assert_called_once: 45,
+      assertGreater: 70,
+      assertLess: 70
+    };
+    DEFAULT_STRENGTH3 = 60;
+    LOOSE_ARG3 = /\b(mock\.ANY|ANY|unittest\.mock\.ANY|pytest\.approx)\b/;
+    UNITTEST_ASSERTION = /^assert[A-Z_]/;
+    MOCK_ASSERTION = /^assert_(called|not_called|has_calls|any_call)/;
+    NEGATED = /^(assertNot|assertIsNot|assertFalse|assertNotIn|assertIsNone)/;
+    MOCK_CONSTRUCTS2 = [
+      { object: "mock", method: "patch" },
+      { object: "unittest", method: "patch" },
+      { object: "monkeypatch", method: "setattr" },
+      { object: "monkeypatch", method: "setitem" },
+      { object: "mocker", method: "patch" }
+    ];
+  }
+});
+
 // src/cli.ts
 import fs5 from "node:fs";
 import { parseArgs } from "node:util";
@@ -14260,18 +14808,24 @@ async function getParser(name2) {
 var adapters = /* @__PURE__ */ new Map();
 async function initAdapters() {
   if (adapters.size > 0) return;
-  const { createTypeScriptAdapter: createTypeScriptAdapter2 } = await Promise.resolve().then(() => (init_typescript(), typescript_exports));
-  const build = async (grammar, id, extensions) => {
+  const [{ createTypeScriptAdapter: createTypeScriptAdapter2 }, { createRubyAdapter: createRubyAdapter2 }, { createPythonAdapter: createPythonAdapter2 }] = await Promise.all([Promise.resolve().then(() => (init_typescript(), typescript_exports)), Promise.resolve().then(() => (init_ruby(), ruby_exports)), Promise.resolve().then(() => (init_python(), python_exports))]);
+  const parseWith = async (grammar) => {
     const parser = await getParser(grammar);
-    return createTypeScriptAdapter2(id, extensions, (source) => {
+    return (source) => {
       const tree = parser.parse(source);
-      if (!tree) throw new Error(`failed to parse ${id} source`);
+      if (!tree) throw new Error(`failed to parse ${grammar} source`);
       return tree;
-    });
+    };
   };
-  registerAdapter(await build("typescript", "typescript", [".ts", ".mts", ".cts"]));
-  registerAdapter(await build("tsx", "tsx", [".tsx", ".jsx"]));
-  registerAdapter(await build("javascript", "javascript", [".js", ".mjs", ".cjs"]));
+  registerAdapter(
+    createTypeScriptAdapter2("typescript", [".ts", ".mts", ".cts"], await parseWith("typescript"))
+  );
+  registerAdapter(createTypeScriptAdapter2("tsx", [".tsx", ".jsx"], await parseWith("tsx")));
+  registerAdapter(
+    createTypeScriptAdapter2("javascript", [".js", ".mjs", ".cjs"], await parseWith("javascript"))
+  );
+  registerAdapter(createRubyAdapter2(await parseWith("ruby")));
+  registerAdapter(createPythonAdapter2(await parseWith("python")));
 }
 function registerAdapter(adapter) {
   for (const ext of adapter.extensions) adapters.set(ext.toLowerCase(), adapter);
@@ -14789,8 +15343,9 @@ function editDistance(a, b, cap = 8) {
 function isRename(a, b) {
   if (a === b) return true;
   const longer = Math.max(a.length, b.length);
+  const shorter = Math.min(a.length, b.length);
   if (longer === 0) return true;
-  if (a.includes(b) || b.includes(a)) return true;
+  if ((a.includes(b) || b.includes(a)) && shorter >= longer * 0.6) return true;
   const threshold = Math.max(2, Math.floor(longer * 0.34));
   return editDistance(a, b, threshold + 1) <= threshold;
 }
@@ -14816,15 +15371,22 @@ function diffTestBlocks(ctx) {
   const afterBlocks = afterAdapter.findTestBlocks(afterTree);
   const matched = [];
   const removed = [];
+  const ambiguous = [];
   const usedAfter = /* @__PURE__ */ new Set();
   for (const before of beforeBlocks) {
     let after = afterBlocks.find(
       (b) => !usedAfter.has(b) && b.kind === before.kind && b.normalizedName === before.normalizedName
     );
     if (!after) {
-      after = afterBlocks.find(
+      const candidates = afterBlocks.filter(
         (b) => !usedAfter.has(b) && b.kind === before.kind && isRename(before.normalizedName, b.normalizedName)
       );
+      if (candidates.length > 1) {
+        ambiguous.push(before);
+        for (const c of candidates) usedAfter.add(c);
+        continue;
+      }
+      after = candidates[0];
     }
     if (!after) {
       removed.push(before);
@@ -14841,6 +15403,7 @@ function diffTestBlocks(ctx) {
   return {
     matched,
     removed,
+    ambiguous,
     added: afterBlocks.filter((b) => !usedAfter.has(b)),
     beforeAdapter,
     afterAdapter,
@@ -15152,7 +15715,7 @@ var nob202 = {
 };
 
 // src/rules/nob203-security-bypass.ts
-var UNCONDITIONAL_EXIT = /^\s*(?:return\s+(?:true|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
+var UNCONDITIONAL_EXIT = /^\s*(?:return\s+(?:true|True|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
 var DISABLED_GUARD = [
   { re: /\bif\s*\(\s*(?:false|0)\s*\)/, label: "if (false)" },
   { re: /\bif\s+False\s*:/, label: "if False:" },

@@ -1,0 +1,10 @@
+{
+  "note": "return true added as the first statement of a policy method",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "app/policies/admin_policy.rb",
+      "messageContains": "allow?"
+    }
+  ]
+}

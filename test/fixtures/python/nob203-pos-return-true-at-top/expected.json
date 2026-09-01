@@ -1,0 +1,10 @@
+{
+  "note": "return True added as the first statement of an authorization function",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "app/permissions/check.py",
+      "messageContains": "can_admin"
+    }
+  ]
+}

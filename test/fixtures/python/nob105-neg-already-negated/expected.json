@@ -1,0 +1,4 @@
+{
+  "note": "An assert that was always negated is not an inversion",
+  "findings": []
+}

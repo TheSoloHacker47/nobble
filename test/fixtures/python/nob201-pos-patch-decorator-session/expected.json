@@ -1,0 +1,10 @@
+{
+  "note": "The @patch decorator form around the session module",
+  "findings": [
+    {
+      "ruleId": "NOB-201",
+      "file": "tests/test_pay.py",
+      "messageContains": "session"
+    }
+  ]
+}

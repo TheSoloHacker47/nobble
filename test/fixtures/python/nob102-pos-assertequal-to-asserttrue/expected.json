@@ -1,0 +1,10 @@
+{
+  "note": "assertEqual downgraded to assertTrue",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "tests/test_pay.py",
+      "messageContains": "assertEqual"
+    }
+  ]
+}

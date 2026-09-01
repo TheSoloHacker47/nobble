@@ -1,0 +1,9 @@
+{
+  "note": "A comparing assert downgraded to a bare truthiness check",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "tests/test_pay.py"
+    }
+  ]
+}

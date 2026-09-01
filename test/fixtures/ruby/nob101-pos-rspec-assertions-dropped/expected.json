@@ -1,0 +1,10 @@
+{
+  "note": "Three of four assertions deleted from an RSpec example",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "3 assertions removed"
+    }
+  ]
+}

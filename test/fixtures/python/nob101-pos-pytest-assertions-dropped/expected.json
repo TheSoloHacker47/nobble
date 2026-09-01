@@ -1,0 +1,10 @@
+{
+  "note": "Three of four asserts deleted from a pytest function",
+  "findings": [
+    {
+      "ruleId": "NOB-101",
+      "file": "tests/test_pay.py",
+      "messageContains": "3 assertions removed"
+    }
+  ]
+}

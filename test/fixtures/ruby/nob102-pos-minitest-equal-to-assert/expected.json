@@ -1,0 +1,9 @@
+{
+  "note": "assert_equal downgraded to a bare assert",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "test/pay_test.rb"
+    }
+  ]
+}

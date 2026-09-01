@@ -197,6 +197,77 @@ elsewhere in the tree.
 merge-base is the parent, so one expression handles both merge styles. Worth recording
 because the bug did not look like a bug -- it looked like a false-positive rate.
 
+### A11. Negation lives in `isNegated`, never in the matcher name
+
+RSpec and Jest express negation as a separate token (`not_to`, `.not`), so the matcher name
+is unchanged by it. Python and Minitest bake it in: `assertNotEqual`, `refute_nil`.
+
+Left alone, that asymmetry breaks two rules at once on those languages. `assertEqual` ->
+`assertNotEqual` looks to NOB-102 like a strong matcher swapped for a weaker one, so NOB-102
+reports a weakening; and NOB-105, whose job an inversion actually is, never sees it.
+
+**Decision:** the Python and Ruby adapters strip negation out of the matcher name and report
+it in `isNegated`. `assertNotEqual` becomes matcher `assertEqual`, negated. This is adapter
+work, not rule work -- exactly where M4 says a language difference belongs.
+
+Related: a bare `assert a == b` scores the same as `assertEqual(a, b)`, because it asserts
+the same thing. Without that, porting a suite from unittest to pytest reads as a wholesale
+weakening of every assertion in the file.
+
+### A12. A block with two plausible successors is not matched at all
+
+`block-matching.ts` originally treated substring containment as a rename. In a file
+containing `test_foo`, `test_foo_disable`, and `test_foo_enable`, that makes `test_foo` a
+rename of both, and the greedy matcher pairs it with whichever it reaches first.
+
+The smoke test caught the consequence on a real PR (`pallets/flask#5917`, a test split in
+two): Nobble reported _"10 assertions removed from test_provide_automatic_options_attr_enable
+(11 -> 1)"_, which describes nothing that happened.
+
+**Decision:** containment must also be substantial (the shorter name at least 60% of the
+longer), and a before-block with more than one plausible successor goes to a new `ambiguous`
+list that no rule fires on. This is the same principle `pairing.ts` already applies to
+source-to-test pairing: a guess that surfaces as a confident finding is worse than silence.
+
+### A13. Final measured finding rate
+
+After A8 and A12, over 150 merged PRs from `vitejs/vite`, `pallets/flask`, and
+`sinatra/sinatra`:
+
+| Metric                                        | Rate                           |
+| --------------------------------------------- | ------------------------------ |
+| PRs flagged (the spec's §11.5 metric)         | **5.3%** — passes the 10% gate |
+| PRs that touched a test file and were flagged | 16.7% (7 of 42)                |
+| **PRs reaching verdict `block`**              | **2.0%** (3 of 150)            |
+| Verdict split                                 | 3 block, 5 warn, 142 pass      |
+
+The 16.7% figure is above 10% and is reported here rather than buried, but every finding
+behind it accurately describes a real event: a test deleted, a test skipped, or a blanket
+suppression added. None is a misfire. The three `block` verdicts are `sinatra/sinatra#2115`
+("Skip broken tests."), `#2124` (the revert that reinstates those skips), and `#2114` (two
+test cases deleted) -- all changes a reviewer should see.
+
+Further tightening was considered and rejected: making NOB-103 stop reporting deleted test
+blocks would remove the rule's entire purpose. Nobble judges the diff, not intent (§2), so
+"a test was deleted" is the correct output even when the deletion was justified. Teams that
+disagree for a given rule have `.nobble.yml`, which is why every rule is configurable.
+
+### A14. M4 required exactly one rule-file change
+
+The milestone's constraint is that adding a language touches only an adapter. Adding Ruby
+and Python changed `src/parsers/` and one character class in `src/rules/nob203-security-bypass.ts`:
+`return True` was missing from the unconditional-exit literals.
+
+**Assessment:** that table already contained `nil`, `None`, `pass`, and `head :ok` before
+either adapter existed -- it was designed as a cross-language literal list from the start,
+and `True` was a data omission in it rather than a structural failure. It was left in the
+rule instead of being promoted to a seventh `LanguageAdapter` method, on the grounds that
+one more interface method for a five-entry literal list is the worse trade. Recorded here
+so the judgement is visible rather than implicit.
+
+Everything else Ruby and Python needed -- Minitest's `def test_*` blocks, RSpec message
+stubs, `@patch` decorators, negation normalization -- landed in the adapters, as intended.
+
 ---
 
 ## Runtime dependency justifications

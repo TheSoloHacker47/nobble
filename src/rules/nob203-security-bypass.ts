@@ -13,7 +13,7 @@ import type { Node } from '../parsers/types.js';
 
 /** An exit that hands back success unconditionally. */
 const UNCONDITIONAL_EXIT =
-  /^\s*(?:return\s+(?:true|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
+  /^\s*(?:return\s+(?:true|True|next\s*\(\s*\)|null|nil|None|\{\s*\}|_?next\(\))\s*;?|return\s*;?|pass|head\s+:ok|next\s*\(\s*\)\s*;?)\s*$/;
 
 /** A check disabled by construction rather than removed. */
 const DISABLED_GUARD: { re: RegExp; label: string }[] = [

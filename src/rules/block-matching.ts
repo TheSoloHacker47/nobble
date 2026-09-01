@@ -21,6 +21,12 @@ export interface BlockDiff {
   matched: MatchedBlock[];
   /** Blocks present before and gone after, with no similarly-named replacement. */
   removed: TestBlock[];
+  /**
+   * Before-blocks with more than one plausible successor -- almost always a test that was
+   * split in two. No rule fires on these: guessing which half is "the" successor produces
+   * a confident, wrong finding, which is worse than staying quiet.
+   */
+  ambiguous: TestBlock[];
   added: TestBlock[];
   beforeAdapter: LanguageAdapter;
   afterAdapter: LanguageAdapter;
@@ -52,12 +58,21 @@ function editDistance(a: string, b: string, cap = 8): number {
   return prev[b.length]!;
 }
 
-/** Two names are "the same test, renamed" if they are close relative to their length. */
+/**
+ * Two names are "the same test, renamed" if they are close relative to their length.
+ *
+ * Containment alone is not enough. In a file with `test_foo`, `test_foo_disable`, and
+ * `test_foo_enable`, a bare `a.includes(b)` makes `test_foo` a rename of BOTH, and the
+ * greedy matcher pairs it with whichever it reaches first -- producing findings like
+ * "10 assertions removed (11 -> 1)" from what was actually a test being split in two.
+ * Containment therefore also has to be substantial.
+ */
 export function isRename(a: string, b: string): boolean {
   if (a === b) return true;
   const longer = Math.max(a.length, b.length);
+  const shorter = Math.min(a.length, b.length);
   if (longer === 0) return true;
-  if (a.includes(b) || b.includes(a)) return true;
+  if ((a.includes(b) || b.includes(a)) && shorter >= longer * 0.6) return true;
   const threshold = Math.max(2, Math.floor(longer * 0.34));
   return editDistance(a, b, threshold + 1) <= threshold;
 }
@@ -101,6 +116,7 @@ export function diffTestBlocks(ctx: RuleContext): BlockDiff | undefined {
 
   const matched: MatchedBlock[] = [];
   const removed: TestBlock[] = [];
+  const ambiguous: TestBlock[] = [];
   const usedAfter = new Set<TestBlock>();
 
   for (const before of beforeBlocks) {
@@ -111,12 +127,20 @@ export function diffTestBlocks(ctx: RuleContext): BlockDiff | undefined {
         !usedAfter.has(b) && b.kind === before.kind && b.normalizedName === before.normalizedName,
     );
     if (!after) {
-      after = afterBlocks.find(
+      const candidates = afterBlocks.filter(
         (b) =>
           !usedAfter.has(b) &&
           b.kind === before.kind &&
           isRename(before.normalizedName, b.normalizedName),
       );
+      // More than one plausible successor means the test was split, not renamed. Picking
+      // one would be a guess, and a guess here reads as a confident finding.
+      if (candidates.length > 1) {
+        ambiguous.push(before);
+        for (const c of candidates) usedAfter.add(c);
+        continue;
+      }
+      after = candidates[0];
     }
     if (!after) {
       removed.push(before);
@@ -134,6 +158,7 @@ export function diffTestBlocks(ctx: RuleContext): BlockDiff | undefined {
   return {
     matched,
     removed,
+    ambiguous,
     added: afterBlocks.filter((b) => !usedAfter.has(b)),
     beforeAdapter,
     afterAdapter,

@@ -1,0 +1,9 @@
+{
+  "note": "assertEqual inverted to assertNotEqual",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "tests/test_pay.py"
+    }
+  ]
+}

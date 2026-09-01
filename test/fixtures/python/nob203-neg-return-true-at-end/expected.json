@@ -1,0 +1,4 @@
+{
+  "note": "return True as the LAST statement is how you write a predicate",
+  "findings": []
+}

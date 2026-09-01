@@ -1,0 +1,10 @@
+{
+  "note": "Exact comparison downgraded to a type check",
+  "findings": [
+    {
+      "ruleId": "NOB-102",
+      "file": "spec/pay_spec.rb",
+      "messageContains": "be_a"
+    }
+  ]
+}

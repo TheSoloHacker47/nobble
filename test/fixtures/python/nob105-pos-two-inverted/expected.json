@@ -1,0 +1,13 @@
+{
+  "note": "Two asserts inverted in one test",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "tests/test_pay.py"
+    },
+    {
+      "ruleId": "NOB-105",
+      "file": "tests/test_pay.py"
+    }
+  ]
+}

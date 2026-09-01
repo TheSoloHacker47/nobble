@@ -1,0 +1,9 @@
+{
+  "note": "A bare pass short-circuits a verification function",
+  "findings": [
+    {
+      "ruleId": "NOB-203",
+      "file": "app/security/verify.py"
+    }
+  ]
+}

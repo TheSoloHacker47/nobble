@@ -1,0 +1,4 @@
+{
+  "note": "MANDATORY NEGATIVE: a suite ported from unittest to pytest with every assertion intact",
+  "findings": []
+}

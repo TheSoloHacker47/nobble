@@ -1,0 +1,10 @@
+{
+  "note": "A bare assert flipped from == to !=",
+  "findings": [
+    {
+      "ruleId": "NOB-105",
+      "file": "tests/test_pay.py",
+      "messageContains": "inverted"
+    }
+  ]
+}

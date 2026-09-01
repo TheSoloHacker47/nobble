@@ -1,0 +1,10 @@
+{
+  "note": "A whole test function removed",
+  "findings": [
+    {
+      "ruleId": "NOB-103",
+      "file": "tests/test_pay.py",
+      "messageContains": "test_rejects_an_expired_card"
+    }
+  ]
+}
