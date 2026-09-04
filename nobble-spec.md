@@ -1,6 +1,17 @@
-# Nobble: Build Specification
+# The original build specification
 
-> **Instructions for the coding agent:** this document is the complete source of truth for the project. Build it exactly as specified. Do not add features that are not listed here. When a decision is genuinely ambiguous, choose the simpler option and record the choice in `DECISIONS.md`. Work through the milestones in order and make sure every milestone's exit criteria pass before moving on.
+> **Historical document.** This is the specification Nobble was built from, written
+> before any code existed and preserved unedited. It is published because the
+> specification, rather than the code, is where the design decisions live.
+>
+> **It is not documentation.** For what Nobble does today, read the
+> [README](README.md). For the decisions taken while building it, including the ones
+> that departed from this document, read [DECISIONS.md](DECISIONS.md) — the spec
+> required that every ambiguous call be recorded there, and it was.
+>
+> The constraints it sets are the interesting part: build exactly what is specified
+> and nothing more, resolve genuine ambiguity by choosing the simpler option, and pass
+> each milestone's exit criteria before starting the next.
 
 ---
 
